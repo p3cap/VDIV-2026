@@ -10,7 +10,7 @@ Elérhetőség (email): dobosipetidani@gmail.com
 
 programfejlesztői környezet és verzió: Python3.13
 
-==== How to setup ====
+==== Setup ====
 
 Python env.:
 
@@ -28,5 +28,7 @@ Frontend (vue):
 cd frontend
 npm install
 ```````````````
+
+Join the Trello to-do board (https://trello.com/invite/b/6996c72600fdca68f9db5350/ATTIad8a225216767fe5ccef09a8f2a9e499B1965B1C/vdiv-2026)
 
 ==== Használati Útmutató ====

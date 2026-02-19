@@ -1,18 +1,18 @@
-*Ez a fájl az olvashatóság miatt készült markdown-ba, mivel a feladat megköveteli a Readme.txt fájl nevet*
+*Ez a readme fájl az olvashatóság miatt készült markdown-ba, mivel a feladat megköveteli a Readme.txt fájl nevet*
 
 # VDIV-2026
 
 ## Verseny információ
 
-**Csapat neve**: Huh?!
-**Csapatagok neve**: Dobosi Péter, Kovács Dávid, Torontáli Ádám
-**Iskola**: BMSZC Puskás Tivadar Távközlési és Infomrtaikai Technikum
-**Felkészítő tanár**: Zámbó Dominik
-**Elérhetőség (email)**: dobosipetidani@gmail.com
+- **Csapat neve**: Huh?!
+- **Csapatagok neve**: Dobosi Péter, Kovács Dávid, Torontáli Ádám
+- **Iskola**: BMSZC Puskás Tivadar Távközlési és Infomrtaikai Technikum
+- **Felkészítő tanár**: Zámbó Dominik
+- **Elérhetőség (email)**: dobosipetidani@gmail.com
 
-**programfejlesztői környezet és verzió**: Python3.13
+- **programfejlesztői környezet és verzió**: Python3.13
 
-## How to setup
+## Setup
 
 ### Python env.:
 ```bash
@@ -28,5 +28,7 @@ pip install -r requirements.txt
 cd frontend
 npm install
 ```
+
+[Join the Trello to-do board](https://trello.com/invite/b/6996c72600fdca68f9db5350/ATTIad8a225216767fe5ccef09a8f2a9e499B1965B1C/vdiv-2026)
 
 ## Használati Útmutató 
