@@ -5,7 +5,6 @@ cd MarsRover
 python -m venv venv
 call venv\Scripts\activate
 pip install -r requirements.txt
-deactivate
 cd ..
 
 echo Mars Rover Dashboard indul...
@@ -14,4 +13,4 @@ npm install
 cd ..
 
 echo Done.
-pause
+deactivate

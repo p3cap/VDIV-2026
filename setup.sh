@@ -5,7 +5,6 @@ cd MarsRover
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-deactivate
 cd ..
 
 echo "Mars Rover Console indul..."
@@ -15,3 +14,4 @@ npm run dev
 cd ..
 
 echo "Done."
+deactivate
