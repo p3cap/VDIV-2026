@@ -7,7 +7,7 @@
 
 - **Csapat neve**: huh?!
 - **Csapatagok neve**: Dobosi Péter, Kovács Dávid, Torontáli Ádám
-- **Iskola**: BMSZC Puskás Tivadar Távközlési és Infomrtaikai Technikum
+- **Iskola**: BMSZC Puskás Tivadar Távközlési és Informatikai Technikum
 - **Felkészítő tanár**: Zámbó Dominik
 - **Elérhetőségek**:
     - Dobosi Péter Dániel: dobosipetidani@gmail.com 
@@ -21,14 +21,14 @@
 
 - Install [node.js](https://nodejs.org/en/download)
 - setup required dependecies
-    - For windows run in terminal:
+    - For windows run in **command prompt**, in directory:
+    ```bat
+    setup/windows
     ```
-    setup
-    ```
-    - For linux/mac run in bash:
+    - For linux/mac run in shell, in directory:
     ```bash
-    chmod +x setup.sh
-    ./setup.sh
+    chmod +x setup/linux.sh
+    .setup/linux.sh
     ```
 
 - [Join the Trello to-do board](https://trello.com/invite/b/6996c72600fdca68f9db5350/ATTIad8a225216767fe5ccef09a8f2a9e499B1965B1C/vdiv-2026)
