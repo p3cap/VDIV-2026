@@ -4,11 +4,14 @@
 
 ## Verseny információ
 
-- **Csapat neve**: Huh?!
+- **Csapat neve**: huh?!
 - **Csapatagok neve**: Dobosi Péter, Kovács Dávid, Torontáli Ádám
 - **Iskola**: BMSZC Puskás Tivadar Távközlési és Infomrtaikai Technikum
 - **Felkészítő tanár**: Zámbó Dominik
-- **Elérhetőség (email)**: dobosipetidani@gmail.com
+- **Elérhetőségek**:
+    - Dobosi Péter Dániel: dobosipetidani@gmail.com 
+    - Torontáli Ádám: torontaliadi07@gmail.com
+    - Kovács Dávid: kovacs.david8002@gmail.com
 
 - **programfejlesztői környezet és verzió**: Python3.13
 
