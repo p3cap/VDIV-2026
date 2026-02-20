@@ -24,10 +24,10 @@ class Simulation:
 
 # Gives an undersatnding how to evaluate the map, with a few helper functuins
 class Map:
-	def __init__(self, map_data:list[list[str]], path_mark:str=".", barrier_mark:str="#", rover_marker:str="S", mineral_markers:list[str]=["B","Y","G"]):
+	def __init__(self, map_data:list[list[str]], path_marker:str=".", barrier_marker:str="#", rover_marker:str="S", mineral_markers:list[str]=["B","Y","G"]):
 		self.map_data = map_data
-		self.path_mark = path_mark
-		self.barrier_mark = barrier_mark
+		self.path_marker = path_marker
+		self.barrier_marker = barrier_marker
 		self.rover_marker = rover_marker
 		self.minerals = mineral_markers
 	

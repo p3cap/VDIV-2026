@@ -3,6 +3,11 @@ from enum import Enum
 from Simulation import Vector2
 from Simulation import Map
 
+"""
+"A rover feladata, hogy adott idő alatt a lehető legtöbb ásványt gyűjtse össze."
+
+"""
+
 class STATUS(Enum):
 	MINE = "mine",
 	PROCESS = "process",
@@ -21,8 +26,12 @@ class Rover:
 		self.battery_charge = battery_charge if battery_charge <= self.MAX_BATTERY_CHARGE else self.MAX_BATTERY_CHARGE
 		self.status = STATUS.IDLE
 		self.pos = Map.get_poses_of_tile(Map.rover_marker, limit=1)
+		self.start_pos = self.pos
 		self.path = Path
 		self.speed = 0
+
+	def get_consumption(self):
+		return 2 * pow(self.speed,2)
 
 	def next_frame(self):
 		# drain battery, update pos, validate next pos
@@ -35,6 +44,8 @@ class Rover:
 	def find_next_goal_position(self):
 		# heat map based optimisation
 		# find best path towards big goal
+		# involve simulation time
+		# get back to start point before simulation ends?
 		pass
 
 
