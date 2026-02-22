@@ -1,11 +1,17 @@
 import { createRouter, createWebHistory } from "vue-router";
-import MapTestPage from "@/views/MapTestPage.vue";
+import MapPage from "@/views/MapPage.vue";
+import DashboardPage from "@/views/DashboardPage.vue";
 
 const routes = [
   {
     path: "/",
     name: "map",
-    component: MapTestPage,
+    component: MapPage,
+  },
+  {
+    path: "/dashboard",
+    name: "dashboard",
+    component: DashboardPage,
   },
 ];
 

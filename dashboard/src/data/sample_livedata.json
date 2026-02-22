@@ -1,0 +1,22 @@
+{
+  "time_of_day": 1000,
+  "rover_position": {"x":0,"y":0},
+  "rover_battery": 100,
+  "rover_storage": {
+    "B": 6,
+    "Y": 7,
+    "G": 100000
+  },
+  "speed": 1,
+  "status": "mining",
+  "distance_travelled": 67,
+  "path_plan": [
+    {"x":1,"y":-1},
+    {"x":0,"y":-1},
+    {"x":1,"y":0},
+    {"x":1,"y":1},
+    {"x":1,"y":-1},
+    {"x":1,"y":0},
+    {"x":1,"y":2}
+  ]
+}

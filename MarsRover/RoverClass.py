@@ -1,6 +1,6 @@
-import Simulation
-import Map
-from Simulation import Vector2
+from MapClass import Map
+from Simulation import Simulation
+from Global import Vector2
 
 import heapq
 import numpy as np
@@ -19,6 +19,7 @@ class STATUS(Enum): # "state machine"
 	MINE = "mine"
 	IDLE = "idle"
 	MOVE = "move"
+	DEAD = "dead"
 
 Path = List[Vector2] # naviagtion path type
 
@@ -26,28 +27,34 @@ class Rover:
 	MAX_SPEED = 3
 	MAX_BATTERY_CHARGE = 100
 
-	MINING_CONSUMPTION_HRS = 4 # 	2 /30mins
-	STANDBY_CONSUMPTION_HRS = 2 # 1 /30mins
-	DAY_CHARGE_SPEED_HRS = 20 # 	10/30mins
+	MINING_CONSUMPTION_PER_HR = 4 # 	2 /30 mins
+	STANDBY_CONSUMPTION_PER_HR = 2 # 1 /30 mins
+	DAY_CHARGE_PER_HR = 20 # 	10/30 mins
+
+	MINING_TIME_HRS = 0.5
 
 	K_MOVEMENT = 2  # k in E = k * v^2
 
-	def __init__(self, id:str, map_obj:Map, simulation:Simulation):
+	def __init__(self, id:str, sim:Simulation):
 		self.id = id
-		self.map = map_obj
-		self.sim = simulation
+		self.sim = sim
 		
 		#defaluts
 		self.battery = 100.0
 		self.status = STATUS.IDLE
 
-		self.pos = self.map.get_poses_of_tile(self.map.rover_marker, limit=1) # get pos on map
+		self.pos = self.sim.map_obj.get_poses_of_tile(self.sim.map_obj.rover_marker, limit=1) # get pos on map
 		self.start_pos = self.pos
 		
 		self.path:Path = [] # the desired path the robot is going to follow
 		self.speed = 1
+
+		# fractional movement progress (tiles). Allows next_frame to be called
+		# with uneven delta_hrs and accumulate partial tile movement.
+		self.move_progress = 0.0
+		self.mine_process_hrs = 0.0
 		
-		self.storage = {key: 0 for key in map_obj.mineral_markers} # dict of minerals {"Mineral":amount}
+		self.storage = {key: 0 for key in sim.map_obj.mineral_markers} # dict of minerals {"Mineral":amount}
 		self.distance_travelled = 0
 
 # ---------------- ENERGY ----------------
@@ -66,30 +73,20 @@ class Rover:
 			case STATUS.MOVE:
 				return self.movement_cost(delta_hrs)
 			case STATUS.MINE:
-				return self.MINING_CONSUMPTION
+				return self.MINING_CONSUMPTION_PER_HR * delta_hrs
 			case STATUS.IDLE:
-				return self.STANDBY_CONSUMPTION
+				return self.STANDBY_CONSUMPTION_PER_HR * delta_hrs
 	
-	# RRVISE!!
+	# calculates energy produced from solar during daytime
 	def energy_produced(self, delta_hrs: float):
-		day = self.sim.day_hrs
-		night = self.sim.night_hrs
-		cycle = day + night # 24
-
-		start = self.sim.elapsed_hrs % cycle
-		end = (start + delta_hrs)
-
-		# Case 1: interval does NOT wrap cycle
-		if end <= cycle:
-			daytime = max(0, min(end, day) - min(start, day))
+		"""Calculate energy produced from solar panel during the interval.
 		
-		# Case 2: interval wraps cycle boundary
-		else:
-			first_part = max(0, day - min(start, day))
-			second_part = min(end - cycle, day)
-			daytime = first_part + max(0, second_part)
-
-		return daytime * self.DAY_CHARGE_SPEED_HRS
+		Uses Simulation's day/night cycle calculator to determine daytime hours.
+		"""
+		start = self.sim.elapsed_hrs
+		end = start + delta_hrs
+		daytime = self.sim.get_daytime_in_interval(start, end)
+		return daytime * self.DAY_CHARGE_PER_HR
 
 # ---------------- A* PATHFINDING ----------------
 
@@ -105,15 +102,17 @@ class Rover:
 		result = []
 		for dx,dy in dirs:
 			n = Vector2(node.x+dx,node.y+dy)
-			if self.map.is_walkable(n):
+			if self.sim.map_obj.is_valid_pos(n):
 				result.append(n)
 		return result
 
-	def find_path_to(self, goal:Vector2):
+	def Astar_pathfind_to(self, goal:Vector2): # TODO seperate A* into a new def
+		if self.status != STATUS.IDLE: return
 		open_set = []
-		heapq.heappush(open_set,(0,self.pos)) # (f_score, node)
+		start = self.pos
+		heapq.heappush(open_set,(0,start)) # (f_score, node)
 		came_from = {}
-		g_score = {self.pos:0} # cost from start
+		g_score = {start:0} # cost from start
 		
 		while open_set:
 			_,current = heapq.heappop(open_set)
@@ -131,66 +130,97 @@ class Rover:
 		
 		path = []
 		cur = goal
+		# Reconstruct path as absolute positions (excluding start)
 		while cur in came_from:
 			path.append(cur)
 			cur = came_from[cur]
 		
 		path.reverse()
-		self.path = path
+		# Convert absolute positions into direction vectors relative to start
+		dirs: List[Vector2] = []
+		prev = start
+		for node in path:
+			dx = node.x - prev.x
+			dy = node.y - prev.y
+			# clamp to -1/0/1 just in case
+			dx = max(-1, min(1, dx))
+			dy = max(-1, min(1, dy))
+			dirs.append(Vector2(dx, dy))
+			prev = node
+
+		self.path = dirs
 		self.status = STATUS.MOVE
-
-# ---------------- GOAL SELECTION ----------------
-
-	def find_next_goal_position(self):
-		minerals = []
-		for m in self.map.mineral_marks:
-			minerals.extend(self.map.get_poses_of_tile(m))
-		
-		if not minerals:
-			return self.start_pos
-		
-		best = None
-		best_dist = 9999
-		
-		for m in minerals:
-			d = self.heuristic(self.pos,m)
-			if d < best_dist:
-				best = m
-				best_dist = d
-		
-		return best
 
 # ---------------- MINING ----------------
 
 	def mine(self):
-		tile_mark = self.map.get_tile(self.pos)
+		tile_mark = self.sim.map_obj.get_tile(self.pos)
+		if tile_mark not in self.sim.map_obj.mineral_markers: return
 
-		if tile_mark not in self.map.mineral_marks: return
-		
+		self.mine_process_hrs = self.MINING_TIME_HRS
 		self.status = STATUS.MINE
 		self.storage[tile_mark] += 1
-		self.map.set_tile(self.pos,self.map.path_marker) # mark map pos as cleared
 
 # ---------------- FRAME UPDATE ----------------
 
-	def next_frame(self):
-		self.battery = np.clip(self.battery, 0, self.MAX_BATTERY_CHARGE) # ensures battery can't be invalid
-		
+	def next_frame(self, delta_hrs:float):
+		if delta_hrs <= 0: return
 
 		if self.status == STATUS.MOVE and self.path:
-			steps = min(self.speed,len(self.path))
-			for _ in range(steps):
-				self.pos = self.path.pop(0)
+			self.move_progress += self.speed * delta_hrs
+
+			# consume whole-tile progress and advance along the path
+			while self.move_progress >= 1.0 and self.path:
+				dir = self.path.pop(0)
+				self.pos = Vector2(self.pos.x + dir.x, self.pos.y + dir.y)
 				self.distance_travelled += 1
-			
+				self.move_progress -= 1.0
+
+			# arrived at goal
 			if not self.path:
-				if self.map.get_tile(self.pos) in self.map.mineral_marks:
-					self.mine()
-				else:
-					self.status = STATUS.IDLE
+				self.status = STATUS.IDLE
+
+		elif self.status == STATUS.MINE:
+			self.mine_process_hrs -= delta_hrs
+			if self.mine_process_hrs <= 0:
+				self.state = STATUS.IDLE
+				self.sim.map_obj.set_tile(self.pos,self.sim.map_obj.path_marker) # mark map pos as cleared
+
+		# Energy
+		consumed = self.energy_consumed(delta_hrs)
+		produced = self.energy_produced(delta_hrs)
+		self.battery += produced - consumed
+
+		# Clamp battery to valid range
+		self.battery = float(np.clip(self.battery, 0, self.MAX_BATTERY_CHARGE))
+
+		# out of energy -> stop
+		if self.battery <= 0:
+			self.status = STATUS.DEAD
+
+# ---------- Print Formatter --------------
+	def __repr__(self):
+		line = "-" * 40
 		
-		elif self.status == STATUS.IDLE:
-			target = self.find_next_goal_position()
-			self.find_path_to(target)
-		
-		self.apply_energy()
+		storage_str = ", ".join(
+			f"{k}:{v}" for k, v in self.storage.items() if v > 0
+		)
+		if not storage_str:
+			storage_str = "empty"
+
+		path_len = len(self.path)
+
+		return (
+			f"\n{line}\n"
+			f"ROVER [{self.id}]\n"
+			f"{line}\n"
+			f"Status      : {self.status.value}\n"
+			f"Position    : ({self.pos.x}, {self.pos.y})\n"
+			f"Speed       : {self.speed} tiles/hr\n"
+			f"Battery     : {self.battery:.2f} / {self.MAX_BATTERY_CHARGE}\n"
+			f"Distance    : {self.distance_travelled} tiles\n"
+			f"Path left   : {path_len} nodes\n"
+			f"Storage     : {storage_str}\n"
+			f"Path     		: {self.path}\n"
+			f"{line}"
+		)

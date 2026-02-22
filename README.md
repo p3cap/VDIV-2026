@@ -1,6 +1,6 @@
-*Ez a readme fájl az olvashatóság miatt készült markdown-ba. A feladat megköveteli a Readme.txt fájl nevet. Ezt a feladat végén módosítjuk.*
+*Ez a readme fájl az olvashatóság miatt készült markdown-ban. A feladat megköveteli a Readme.txt fájl nevet. Ezt a feladat végén módosítjuk.*
 
-# VDIV-2026 - huh
+# VDIV-2026 - huh?!
 
 ---
 ## Verseny információ

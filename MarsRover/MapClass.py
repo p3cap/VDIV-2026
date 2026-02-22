@@ -1,11 +1,22 @@
-from Simulation import Vector2
+import csv
+from Global import Vector2
+
+def matrix_from_csv(csv_path:str):
+	matrix = []
+
+	with open(csv_path, newline="", encoding="utf-8") as f:
+		reader = csv.reader(f)
+		for row in reader:
+			matrix.append(row)
+
+	return matrix
 
 class Map:
 	def __init__(self, map_data:list[list[str]], path_marker:str=".", barrier_marker:str="#", rover_marker:str="S", mineral_markers:list[str]=["B","Y","G"]):
 		self.map_data = map_data
 		self.path_marker = path_marker
-		self.barrier_markers = barrier_marker
-		self.rover_markers = rover_marker
+		self.barrier_marker = barrier_marker
+		self.rover_marker = rover_marker
 		self.mineral_markers = mineral_markers
 		self.width = len(map_data[0])
 		self.height = len(map_data)

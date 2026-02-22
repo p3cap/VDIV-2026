@@ -1,6 +1,22 @@
 {
+  "map_matrix": [["S","#"],["B","Y"],["G","."]],
   "day_hrs": 16.0,
   "night_hrs": 8.0,
-  "rovar_mine_hrs": 0.5,
-  "run_hrs": 24
+  "run_hrs": 24,
+  "sim_time_multiplier": 1000,
+  "markers": {
+    "S": "Rover Start",
+    ".": "Field",
+    "#": "Barrier",
+    "Y": "Gold",
+    "B": "Ice",
+    "G": "Green"
+  },
+  "rover_name": "test_rover",
+  "rover_max_battery": 100,
+  "rover_mining_consumption_per_hr": 4,
+  "rover_standby_consumption_per_hr": 2,
+  "rover_charge_per_hr": 20,
+  "rover_mine_hrs": 0.5,
+  "rover_mode": "machine_learning"
 }

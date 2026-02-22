@@ -1,16 +1,17 @@
 {
-  "time_of_day": 1000,
+  "time_of_day": 10.4,
+  "elapsed_hrs": 230.9,
   "rover_position": {"x":0,"y":0},
-  "rover_battery": 100,
+  "rover_battery": 100.0,
   "rover_storage": {
     "B": 6,
     "Y": 7,
     "G": 100000
   },
-  "speed": 1,
-  "status": "mining",
-  "ditsnace_travelled": 67,
-  "path_plan": [
+  "rover_speed": 1,
+  "rover_status": "mine",
+  "rover_distance_travelled": 67,
+  "rover_path_plan": [
     {"x":1,"y":0},
     {"x":1,"y":0},
     {"x":1,"y":0},
@@ -18,5 +19,8 @@
     {"x":1,"y":1},
     {"x":1,"y":1},
     {"x":1,"y":0}
-  ]
+  ],
+  
+  "rover_energy_consumption": 5.0,
+  "rover_energy_produce": 10.0
 }
