@@ -155,7 +155,7 @@ class Rover:
 
 	def mine(self):
 		tile_mark = self.sim.map_obj.get_tile(self.pos)
-		if tile_mark not in self.sim.map_obj.mineral_markers: return
+		if tile_mark not in self.sim.map_obj.mineral_markers or self.status != STATUS.MINE : return
 
 		self.mine_process_hrs = self.MINING_TIME_HRS
 		self.status = STATUS.MINE

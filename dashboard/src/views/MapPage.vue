@@ -31,7 +31,7 @@ export default {
     // Első lekérés azonnal
     this.fetchData();
     // Utána 2 másodpercenként
-    this.polling = setInterval(this.fetchData, 100);
+    this.polling = setInterval(this.fetchData, 2000);
   },
 
   beforeUnmount() {
