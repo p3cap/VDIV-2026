@@ -1,334 +1,349 @@
 <template>
-<div class="map-wrapper">
-<div class="map" ref="mapElement">
-<div v-for="(row, y) in map.grid" :key="y" class="row">
-<div v-for="(cell, x) in row" :key="x" class="cell" :class="cellClass(cell, x, y)" />
-</div>
-
-<div ref="roverVisual" class="rover-entity"></div>
-
-<svg
-class="path-overlay"
-:width="totalWidth"
-:height="totalHeight"
-:viewBox="`0 0 ${totalWidthPx} ${totalHeightPx}`"
->
-<defs>
-<marker id="endX" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto">
-<path
-d="M1,1 L4,4 M4,1 L1,4"
-stroke="#00ffcc"
-stroke-width="1"
-stroke-linecap="round"
-class="destination"
-/>
-</marker>
-</defs>
-
-<polyline
-v-if="pathPoints.length >= 2"
-:points="svgPoints"
-fill="none"
-stroke="#00ffcc"
-stroke-width="3.2"
-stroke-linecap="round"
-stroke-linejoin="round"
-marker-end="url(#endX)"
-class="path-line"
-/>
-</svg>
-</div>
-</div>
+  <div class="map-wrapper">
+    <div ref="pixiContainer" class="pixi-container"></div>
+  </div>
 </template>
-<script>
-import { computed, ref, watch, onMounted } from 'vue'
-import { animate, spring} from 'animejs'
+
+<script setup>
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import * as PIXI from 'pixi.js'
+import { Viewport } from 'pixi-viewport'
+import { Assets } from 'pixi.js'
 import marsMap from '@/data/marsMap.json'
-
-export default {
-name: 'MapComponent',
-props: {
-roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
-pathPlan: { type: Array, default: () => [] },
-},
-
-setup(props) {
-const CELL_SIZE = 22
-const PADDING = 10
-const roverVisual = ref(null)
-
-// Referencia az aktuálisan futó animációnak, hogy megállíthassuk
-let activeAnimation = null
-
-// Koordináta -> Pixel konverzió (biztonsági mentéssel, ha a koordináta undefined)
-const getPixelPos = (coords) => {
-return {
-x: (coords?.x ?? 0) * CELL_SIZE + PADDING,
-y: (coords?.y ?? 0) * CELL_SIZE + PADDING,
-}
-}
-
-/**
-* Mozgatásért felelős függvény
-* @param {Object} newPos - Az új koordináták {x, y}
-* @param {Boolean} instant - Ha igaz, animáció nélkül ugrik a helyére
-*/
-const moveRover = (newPos, instant = false) => {
-if (!roverVisual.value || !newPos) return
-
-const targetPixels = getPixelPos(newPos)
-
-// Ha már fut egy animáció, azt megállítjuk, hogy ne legyen rángatózás
-if (activeAnimation) activeAnimation.pause()
-
-activeAnimation = animate(roverVisual.value, {
-translateX: targetPixels.x,
-translateY: targetPixels.y,
-duration: instant ? 0 : 300,
-easing: 'easeInOutQuad',
-})
-}
-
-// Figyeljük a roverPosition prop-ot
-watch(
-() => props.roverPosition,
-(newVal, oldVal) => {
-if (!newVal) return
-
-// Csak akkor indítunk új animációt, ha tényleg változott a koordináta
-const hasChanged = !oldVal || newVal.x !== oldVal.x || newVal.y !== oldVal.y
-
-if (hasChanged) {
-moveRover(newVal)
-}
-},
-{ deep: true },
-)
-
-// Amikor a komponens megjelenik (vagy a Map JSON betöltődik)
-onMounted(() => {
-if (props.roverPosition) {
-// Azonnali ugrás a kezdőpozícióra (0ms alatt), így nincs 0,0-ról indulás
-moveRover(props.roverPosition, true)
-}
+import testpng from '@/assets/textures/pttt_logo_mini.png'
+/* PROPS */
+const props = defineProps({
+  roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
+  pathPlan: { type: Array, default: () => [] },
 })
 
-// --- Számítások az SVG útvonalhoz és a rácshoz ---
-const currentPosition = computed(() => props.roverPosition)
+/* =======================
+   REFS / STATE
+======================= */
+const pixiContainer = ref(null)
+const initialized = ref(false)
+const cellSize = ref(28)
 
-const plannedPath = computed(() => {
-const path = []
-let pos = { ...currentPosition.value }
-for (const step of props.pathPlan) {
-pos = { x: pos.x + step.x, y: pos.y + step.y }
-path.push({ ...pos })
+let app = null
+let viewport = null
+let mapContainer = null
+let rover = null
+let pathGraphics = null
+
+/* =======================
+   CONSTANTS
+======================= */
+const PADDING = 30
+
+// ─── ITT KELL CSAK MÓDOSÍTANOD ────────────────────────────────
+// Minden típus → textúra elérési útja (relatív a public mappához vagy src/assets-hez)
+const texturePaths = {
+  '.': testpng,          // vagy '@/assets/textures/dirt.png' – attól függ, mit használsz
+  '#': '/textures/rock.png',
+  'B': '/textures/blue-crystal.png',
+  'Y': '/textures/yellow-gem.png',
+  'G': '/textures/green-plant.png',
+  'S': '/textures/sand.png',
+  // ha új típus jön, csak ide írd be az utat
 }
-return path
+
+/* =======================
+   MOUNT
+======================= */
+onMounted(async () => {
+  if (!pixiContainer.value) return
+
+  app = new PIXI.Application()
+
+  await app.init({
+    backgroundColor: 0x1e1e2e,
+    resizeTo: pixiContainer.value,
+    antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+  })
+
+  pixiContainer.value.appendChild(app.canvas)
+
+  const cols = marsMap.grid[0].length
+  const rows = marsMap.grid.length
+  const worldW = cols * cellSize.value + PADDING * 2
+  const worldH = rows * cellSize.value + PADDING * 2
+
+  viewport = new Viewport({
+    screenWidth: app.screen.width,
+    screenHeight: app.screen.height,
+    worldWidth: worldW,
+    worldHeight: worldH,
+    events: app.renderer.events,
+  })
+
+  viewport
+    .drag()
+    .wheel()
+    .pinch()
+    .decelerate()
+    .clamp({ direction: 'all' })
+    .clampZoom({ minScale: 0.4, maxScale: 3.0 })
+
+  app.stage.addChild(viewport)
+
+  mapContainer = new PIXI.Container()
+  viewport.addChild(mapContainer)
+
+  // Textúrák betöltése + fallback logika
+  const textureMap = await loadTexturesWithFallback()
+
+  drawGrid(mapContainer, textureMap)
+
+  pathGraphics = new PIXI.Graphics()
+  mapContainer.addChild(pathGraphics)
+
+  rover = createRoverGraphics()
+  mapContainer.addChild(rover)
+
+  updateRoverPosition(props.roverPosition, true)
+  drawPath()
+
+  viewport.moveCenter(worldW / 2, worldH / 2)
+  viewport.fitWorld(true)
+  viewport.scale.set(0.95)
+
+  initialized.value = true
+
+  await nextTick()
+  forceResize()
+  setTimeout(forceResize, 100)
+
+  window.addEventListener('resize', forceResize)
 })
 
-const pathPoints = computed(() => [currentPosition.value, ...plannedPath.value])
-
-const rowCount = computed(() => marsMap.grid.length)
-const colCount = computed(() => marsMap.grid[0]?.length ?? 0)
-
-const totalWidthPx = computed(() => colCount.value * CELL_SIZE + PADDING * 2)
-const totalHeightPx = computed(() => rowCount.value * CELL_SIZE + PADDING * 2)
-
-const svgPoints = computed(() => {
-return pathPoints.value
-.map((p) => {
-const cx = p.x * CELL_SIZE + CELL_SIZE / 2 + PADDING
-const cy = p.y * CELL_SIZE + CELL_SIZE / 2 + PADDING
-return `${cx},${cy}`
-})
-.join(' ')
+onUnmounted(() => {
+  window.removeEventListener('resize', forceResize)
+  if (app) app.destroy(true, { children: true })
 })
 
-function cellClass(cell, x, y) {
-switch (cell) {
-case '.':
-return 'ground'
-case '#':
-return 'rock'
-case 'B':
-return 'blue'
-case 'Y':
-return 'yellow'
-case 'G':
-return 'green'
-case 'S':
-return 'start'
-default:
-return 'unknown'
-}
+/* =======================
+   TEXTÚRA BETÖLTÉS + FALLBACK
+======================= */
+async function loadTexturesWithFallback() {
+  const textureMap = {}           // type → PIXI.Texture | null
+  const loadPromises = []
+
+  for (const [type, path] of Object.entries(texturePaths)) {
+    if (!path) {
+      textureMap[type] = null
+      continue
+    }
+
+    const promise = Assets.load(path)
+      .then(texture => {
+        textureMap[type] = texture
+        console.log(`Textúra betöltve: ${type} → ${path}`)
+      })
+      .catch(err => {
+        console.warn(`Textúra betöltési hiba (${type}): ${path}`, err)
+        textureMap[type] = null   // → fallback a drawGrid-ben
+      })
+
+    loadPromises.push(promise)
+  }
+
+  // Megvárjuk az összeset, de nem áll le, ha van hiba
+  await Promise.allSettled(loadPromises)
+
+  return textureMap
 }
 
-return {
-map: marsMap,
-cellClass,
-pathPoints,
-svgPoints,
-totalWidth: computed(() => `${totalWidthPx.value}px`),
-totalHeight: computed(() => `${totalHeightPx.value}px`),
-totalWidthPx,
-totalHeightPx,
-roverVisual,
+/* =======================
+   GRID – textúra vagy fallback szín
+======================= */
+function drawGrid(container, textureMap) {
+  const rows = marsMap.grid.length
+  const cols = marsMap.grid[0].length
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const type = marsMap.grid[y][x]
+      const texture = textureMap[type]   // lehet null
+
+      let cell
+
+      if (texture) {
+        // Textúrás verzió
+        cell = new PIXI.Sprite(texture)
+        cell.width = cellSize.value - 2
+        cell.height = cellSize.value - 2
+        cell.position.set(
+          x * cellSize.value + PADDING + 1,
+          y * cellSize.value + PADDING + 1
+        )
+
+        // Opcionális: ha pixeles / blurry kell lenni
+        // cell.texture.source.scaleMode = 'nearest'
+
+      } else {
+        // Fallback: régi színes Graphics
+        cell = new PIXI.Graphics()
+        cell
+          .roundRect(
+            x * cellSize.value + PADDING,
+            y * cellSize.value + PADDING,
+            cellSize.value - 2,
+            cellSize.value - 2,
+            4
+          )
+          .fill(getCellColor(type))
+      }
+
+      // Kereshetővé tesszük később is
+      cell.cellType = type
+      cell.gridX = x
+      cell.gridY = y
+
+      container.addChild(cell)
+    }
+  }
 }
-},
+
+function getCellColor(type) {
+  const colors = {
+    '.': 0xbc6124,
+    '#': 0x4a4a4a,
+    'B': 0x4cc9f0,
+    'Y': 0xffd700,
+    'G': 0x2ecc71,
+    'S': 0x333333,
+  }
+  return colors[type] || 0x555555
 }
+
+/* =======================
+   ROVER (változatlan)
+======================= */
+function createRoverGraphics() {
+  const cont = new PIXI.Container()
+  const body = new PIXI.Graphics()
+    .roundRect(0, 0, 18, 18, 4)
+    .fill(0xffffff)
+
+  const dot = new PIXI.Graphics()
+    .circle(9, 9, 4)
+    .fill(0xe63946)
+
+  cont.addChild(body, dot)
+  cont.pivot.set(9, 9)
+  return cont
+}
+
+function updateRoverPosition(pos, instant = false) {
+  if (!rover || !pos) return
+
+  const tx = pos.x * cellSize.value + cellSize.value / 2 + PADDING
+  const ty = pos.y * cellSize.value + cellSize.value / 2 + PADDING
+
+  if (instant) {
+    rover.position.set(tx, ty)
+    return
+  }
+
+  const sx = rover.x, sy = rover.y
+  const start = performance.now()
+  const duration = 300
+
+  function animate(now) {
+    const t = Math.min((now - start) / duration, 1)
+    rover.x = sx + (tx - sx) * t
+    rover.y = sy + (ty - sy) * t
+    if (t < 1) requestAnimationFrame(animate)
+  }
+
+  requestAnimationFrame(animate)
+}
+
+/* =======================
+   PATH (változatlan)
+======================= */
+function drawPath() {
+  if (!pathGraphics) return
+  pathGraphics.clear()
+
+  if (!props.pathPlan?.length) return
+
+  let current = { ...props.roverPosition }
+
+  for (const step of props.pathPlan) {
+    if (!step || typeof step.x !== 'number' || typeof step.y !== 'number') continue
+
+    const next = {
+      x: current.x + step.x,
+      y: current.y + step.y
+    }
+
+    if (Math.abs(step.x) <= 1 && Math.abs(step.y) <= 1 && (step.x !== 0 || step.y !== 0)) {
+      pathGraphics
+        .moveTo(
+          current.x * cellSize.value + cellSize.value / 2 + PADDING,
+          current.y * cellSize.value + cellSize.value / 2 + PADDING
+        )
+        .lineTo(
+          next.x * cellSize.value + cellSize.value / 2 + PADDING,
+          next.y * cellSize.value + cellSize.value / 2 + PADDING
+        )
+        .stroke({ width: 4, color: 0x00ffcc, alpha: 1, cap: 'round', join: 'round' })
+    }
+
+    current = next
+  }
+}
+
+/* =======================
+   RESIZE (változatlan)
+======================= */
+function forceResize() {
+  if (!app || !viewport || !pixiContainer.value) return
+  const w = pixiContainer.value.clientWidth
+  const h = pixiContainer.value.clientHeight
+  if (w <= 0 || h <= 0) return
+
+  app.renderer.resize(w, h)
+  viewport.resize(w, h)
+  viewport.fitWorld(true)
+}
+
+/* =======================
+   WATCHERS (változatlan)
+======================= */
+watch(() => props.roverPosition, (newPos) => {
+  if (initialized.value) {
+    updateRoverPosition(newPos)
+    drawPath()
+  }
+}, { deep: true })
+
+watch(() => props.pathPlan, () => {
+  if (initialized.value) drawPath()
+}, { deep: true })
 </script>
 
 <style scoped>
 .map-wrapper {
-position: relative;
-display: inline-block;
-padding: 20px;
-background: #1a1a1a;
-border-radius: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60vw;
+  max-width: 1600px;
+  height: 85vh;
+  margin: 0 auto;
+  background: #1a1a2e;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  flex: none;
 }
 
-.map {
-padding: 10px;
-background: #3d2b1f;
-border-radius: 8px;
-position: relative;
-box-shadow:
-inset 0 0 20px rgba(0, 0, 0, 0.5),
-0 10px 30px rgba(0, 0, 0, 0.8);
-border: 4px solid #2a1d15;
-line-height: 0;
-}
-
-.row {
-display: flex;
-}
-
-.cell {
-width: 20px;
-height: 20px;
-margin: 1px;
-box-sizing: border-box;
-border-radius: 3px;
-transition: all 0.3s ease;
-}
-
-.ground {
-background-color: #bc6124;
-background-image: radial-gradient(#cc7539 10%, transparent 20%);
-background-size: 4px 4px;
-}
-
-.rock {
-background: #4a4a4a;
-box-shadow: inset -3px -3px 0px #2a2a2a;
-border-radius: 5px;
-position: relative;
-}
-.rock::after {
-content: '';
-position: absolute;
-top: 4px;
-left: 4px;
-width: 4px;
-height: 4px;
-background: #666;
-border-radius: 50%;
-}
-
-.blue {
-background: #4cc9f0;
-box-shadow:
-0 0 8px #4cc9f0,
-inset -3px -3px 0 white;
-border-radius: 5px;
-position: relative;
-}
-.blue::after {
-content: '';
-position: absolute;
-top: 4px;
-left: 4px;
-width: 4px;
-height: 4px;
-background: rgb(165, 165, 255);
-border-radius: 50%;
-}
-
-.yellow {
-background: #ffd700;
-box-shadow:
-0 0 10px #ffd700,
-inset -3px -3px 0 white;
-border-radius: 5px;
-position: relative;
-}
-
-.green {
-background: #2ecc71;
-box-shadow:
-0 0 8px #2ecc71,
-inset -3px -3px 0 white;
-border-radius: 5px;
-position: relative;
-}
-
-.start {
-background: #333;
-border: 2px dashed #00ffcc;
-display: flex;
-align-items: center;
-justify-content: center;
-}
-
-.rover-entity {
-top: 3px;
-left: 3px;
-position: absolute;
-width: 16px;
-height: 16px;
-background: #ffffff;
-border-radius: 4px;
-box-shadow:
-0 0 15px #fff,
-0 0 5px #e63946;
-z-index: 10;
-pointer-events: none;
-will-change: transform;
-}
-
-.rover-entity::after {
-content: '';
-position: absolute;
-width: 6px;
-height: 6px;
-background: #e63946;
-border-radius: 50%;
-top: 50%;
-left: 50%;
-transform: translate(-50%, -50%);
-}
-
-.path-overlay {
-position: absolute;
-top: 0;
-left: 0;
-pointer-events: none;
-z-index: 5;
-}
-
-.path-line {
-filter: drop-shadow(0 0 3px #00ffcc);
-stroke-dasharray: 4;
-animation: dash 20s linear infinite;
-}
-
-@keyframes dash {
-to {
-stroke-dashoffset: -100;
-}
-}
-
-.destination {
-filter: drop-shadow(0 0 5px #00ffcc);
+.pixi-container {
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>

@@ -2,14 +2,8 @@ import csv
 from Global import Vector2
 
 def matrix_from_csv(csv_path:str):
-	matrix = []
-
 	with open(csv_path, newline="", encoding="utf-8") as f:
-		reader = csv.reader(f)
-		for row in reader:
-			matrix.append(row)
-
-	return matrix
+		return [row for row in csv.reader(f)]
 
 class Map:
 	def __init__(self, map_data:list[list[str]], path_marker:str=".", barrier_marker:str="#", rover_marker:str="S", mineral_markers:list[str]=["B","Y","G"]):

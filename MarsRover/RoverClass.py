@@ -110,45 +110,51 @@ class Rover:
 				result.append(n)
 		return result
 
-	def Astar_pathfind_to(self, goal:Vector2): # TODO seperate A* into a new def
-		if self.status != STATUS.IDLE: return
+	def astar(self, start: Vector2, goal: Vector2): # TODO REVISE!!!!!!!!!!!!!!!!
 		open_set = []
-		start = self.pos
-		heapq.heappush(open_set,(0,start)) # (f_score, node)
+		heapq.heappush(open_set, (0, start))
+
 		came_from = {}
-		g_score = {start:0} # cost from start
-		
+		g_score = {start: 0}
+
 		while open_set:
-			_,current = heapq.heappop(open_set)
-			
-			if current == goal: break
-			
+			_, current = heapq.heappop(open_set)
+
+			if current == goal:
+				break
+
 			for neighbor in self.get_neighbors(current):
-				tentative = g_score[current] + 1
-				
+				tentative = g_score[current] + 16
+
 				if neighbor not in g_score or tentative < g_score[neighbor]:
 					came_from[neighbor] = current
 					g_score[neighbor] = tentative
-					f = tentative + self.heuristic(neighbor,goal)
-					heapq.heappush(open_set,(f,neighbor))
-		
+					f = tentative + self.heuristic(neighbor, goal)
+					heapq.heappush(open_set, (f, neighbor))
+
+		# reconstruct absolute path
 		path = []
 		cur = goal
-		# Reconstruct path as absolute positions (excluding start)
+
 		while cur in came_from:
 			path.append(cur)
 			cur = came_from[cur]
-		
+
 		path.reverse()
-		# Convert absolute positions into direction vectors relative to start
-		dirs: List[Vector2] = []
+		return path
+
+	def path_find_to(self, goal: Vector2):
+		if self.status != STATUS.IDLE: return
+
+		start = self.pos
+		absolute_path = self.astar(start, goal)
+		dirs = []
 		prev = start
-		for node in path:
-			dx = node.x - prev.x
-			dy = node.y - prev.y
-			# clamp to -1/0/1 just in case
-			dx = max(-1, min(1, dx))
-			dy = max(-1, min(1, dy))
+
+		# convert into realtive steps ex.: Vector2(x=-1,y=1) => left up
+		for node in absolute_path: 
+			dx = int(np.clip(node.x - prev.x ,-1, 1)) # clamp it for safety
+			dy = int(np.clip(node.y - prev.y ,-1, 1))
 			dirs.append(Vector2(dx, dy))
 			prev = node
 
@@ -159,7 +165,7 @@ class Rover:
 
 	def mine(self):
 		tile_mark = self.sim.map_obj.get_tile(self.pos)
-		if tile_mark not in self.sim.map_obj.mineral_markers or self.status != STATUS.MINE : return
+		if tile_mark not in self.sim.map_obj.mineral_markers or self.status == STATUS.MINE: return
 
 		self.mine_process_hrs = self.MINING_TIME_HRS
 		self.status = STATUS.MINE
@@ -187,7 +193,7 @@ class Rover:
 		elif self.status == STATUS.MINE:
 			self.mine_process_hrs -= delta_hrs
 			if self.mine_process_hrs <= 0:
-				self.state = STATUS.IDLE
+				self.status = STATUS.IDLE
 				self.sim.map_obj.set_tile(self.pos,self.sim.map_obj.path_marker) # mark map pos as cleared
 		
 		else:
@@ -207,7 +213,7 @@ class Rover:
 
 # ---------- Print Formatter --------------
 	def __repr__(self):
-		line = "-" * 40
+		line = "=" * 40
 		
 		storage_str = ", ".join(
 			f"{k}:{v}" for k, v in self.storage.items() if v > 0
