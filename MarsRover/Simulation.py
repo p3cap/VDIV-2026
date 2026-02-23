@@ -14,7 +14,7 @@ class Simulation:
 		self.elapsed_hrs = 0.0
 		self.is_day = True # TODO make func for calculating elapsed times daynight cycle
 
-	def next_frame(self, delta_hrs:float):
+	def update(self, delta_hrs:float):
 		self.elapsed_hrs += delta_hrs
 		
 		cycle = self.day_hrs + self.night_hrs

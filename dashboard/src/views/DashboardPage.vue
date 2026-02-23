@@ -1,7 +1,7 @@
 <script setup>
 import { reactive } from 'vue'
 import ChartComponent from '@/components/ChartComponent.vue'
-
+import HeatMap from '@/components/HeatMap.vue'
 const lineChartOptions = reactive({
   title: { text: 'Fitymahegedu' },
   tooltip: { trigger: 'axis' },
@@ -50,5 +50,6 @@ function addRandomGradually() {
       height="400px"
       width="600px"
     />
+    <HeatMap />
   </div>
 </template>

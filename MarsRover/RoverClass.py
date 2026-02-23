@@ -21,10 +21,14 @@ class STATUS(Enum): # "state machine"
 	MOVE = "move"
 	DEAD = "dead"
 
+class GEARS(Enum): # calculated in block/hrs
+	SLOW = 2
+	NORMAL = 4
+	FAST = 6
+
 Path = List[Vector2] # naviagtion path type
 
 class Rover:
-	MAX_SPEED = 3
 	MAX_BATTERY_CHARGE = 100
 
 	MINING_CONSUMPTION_PER_HR = 4 # 	2 /30 mins
@@ -47,7 +51,7 @@ class Rover:
 		self.start_pos = self.pos
 		
 		self.path:Path = [] # the desired path the robot is going to follow
-		self.speed = 1
+		self.gear = GEARS.SLOW
 
 		# fractional movement progress (tiles). Allows next_frame to be called
 		# with uneven delta_hrs and accumulate partial tile movement.
@@ -63,7 +67,7 @@ class Rover:
 		# all consatnts are in /hour calcuation for easier usage
 		# formula: 
 		# k * v^2 = 2 * half_hour_consumption^2 * half_hours_passed
-		speed_per_half_hr = self.speed / 2
+		speed_per_half_hr = self.gear.value / 2
 		half_hours = delta_hrs * 2 # amount of half hours passed (ex.: 1.5 * 2 = 3)
 		return 2 * (speed_per_half_hr ** 2) * half_hours
 
@@ -163,11 +167,11 @@ class Rover:
 
 # ---------------- FRAME UPDATE ----------------
 
-	def next_frame(self, delta_hrs:float):
+	def update(self, delta_hrs:float):
 		if delta_hrs <= 0: return
 
 		if self.status == STATUS.MOVE and self.path:
-			self.move_progress += self.speed * delta_hrs
+			self.move_progress += self.gear.value * delta_hrs
 
 			# consume whole-tile progress and advance along the path
 			while self.move_progress >= 1.0 and self.path:
@@ -185,6 +189,9 @@ class Rover:
 			if self.mine_process_hrs <= 0:
 				self.state = STATUS.IDLE
 				self.sim.map_obj.set_tile(self.pos,self.sim.map_obj.path_marker) # mark map pos as cleared
+		
+		else:
+			self.status = STATUS.IDLE
 
 		# Energy
 		consumed = self.energy_consumed(delta_hrs)
@@ -216,9 +223,10 @@ class Rover:
 			f"{line}\n"
 			f"Status      : {self.status.value}\n"
 			f"Position    : ({self.pos.x}, {self.pos.y})\n"
-			f"Speed       : {self.speed} tiles/hr\n"
+			f"Speed       : {self.gear.value}\n"
 			f"Battery     : {self.battery:.2f} / {self.MAX_BATTERY_CHARGE}\n"
 			f"Distance    : {self.distance_travelled} tiles\n"
+			f"move_prcs   : {self.move_progress} \n"
 			f"Path left   : {path_len} nodes\n"
 			f"Storage     : {storage_str}\n"
 			f"Path     		: {self.path}\n"
