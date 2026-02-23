@@ -1,3 +1,5 @@
 {
-	"python-envs.pythonProjects": []
+	"python-envs.pythonProjects": [],
+	"python.defaultInterpreterPath": "${workspaceFolder}/MarsRover/venv/bin/python",
+	"python.terminal.activateEnvironment": true
 }

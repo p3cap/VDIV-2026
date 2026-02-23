@@ -7,7 +7,7 @@ from Global import Vector2
 url = "http://127.0.0.1:8000/send_data"
 
 map_obj = Map(
-	map_data = matrix_from_csv(r"MarsRover\data\mars_map_50x50.csv")
+	map_data = matrix_from_csv(r"MarsRover/data/mars_map_50x50.csv")
 )
 
 sim = Simulation(
@@ -34,7 +34,7 @@ while True:
 	delta = time.perf_counter() - last_time
 	last_time = time.perf_counter()
 	print(f"frame started with delta: {delta}")
-	delta_hrs = delta # TODO remove divison laterrr, TEST ONLY
+	delta_hrs = 0.5 # TODO remove divison laterrr, TEST ONLY
 	sim.next_frame(delta_hrs)
 	rover.next_frame(delta_hrs)
 
@@ -67,4 +67,4 @@ while True:
 	response = requests.post(url, json=live_data)
 	#print("Server response:", response.json())
 
-	time.sleep(30) # TODO 1/sim.sim_time_multiplie
+	time.sleep(1) # TODO 1/sim.sim_time_multiplie
