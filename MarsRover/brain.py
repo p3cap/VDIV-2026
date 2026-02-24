@@ -11,6 +11,7 @@ import time
 #npm run dev
 
 ercek_helye = []
+tavolsag_lista = []
 
 map_obj = Map(
     map_data = matrix_from_csv(r"MarsRover/data/mars_map_50x50.csv") # TODO make universal
@@ -36,8 +37,7 @@ rover = Rover(
 
 #rover.battery
 
-#path_find_to  át kell nevezni erre pull utan
-rover.Astar_pathfind_to(Vector2(15,15)) #rover meny erre a poziciora (x,y)
+#rover.path_find_to(Vector2(15,15)) #rover meny erre a poziciora (x,y)
 
 #rover.gear = GEARS.SLOW 1-be valt
 #GEARS.NORMAL 2-be valt
@@ -100,9 +100,8 @@ def bfs(map, tx, ty):
 
 
 def tavolsagok(map):
-    tavolsag_lista = []
-
-    rover_x = rover.pos.x
+    
+    rover_x = rover.pos.    x
     rover_y = rover.pos.y
 
     for ore_x, ore_y in ercek_helye:
@@ -111,15 +110,20 @@ def tavolsagok(map):
 
     return tavolsag_lista
 
+
+
+def legkozelebbi_erc():
+    elerheto = [t for t in tavolsag_lista if t[2] is not None]
+    return  min(elerheto, key=lambda t: t[2])
+
 print(map_obj.map_data)
 
-#ercek_a_mapon()
-#print(tavolsagok(map))
+ercek_a_mapon()
+tavolsagok(map)
+print()
 
 
-
-
-while True:
+def serverpost():
 
     sim.update(0.5)
     rover.update(0.5)
@@ -141,5 +145,11 @@ while True:
     response = requests.post(url, json=live_data)
 
 
+rover.pos = Vector2(0,0)
 
+while(rover.battery != 0):  
+    leg = legkozelebbi_erc()
+    rover.path_find_to(Vector2(leg[1],leg[0]))
+    serverpost()
+    rover.mine()
 
