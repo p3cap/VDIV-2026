@@ -11,16 +11,12 @@ import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
 import testpng from '@/assets/textures/pttt_logo_mini.png'
 
-/* PROPS */
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
   pathPlan: { type: Array, default: () => [] },
   mapMatrix: { type: Array, default: () => [] },
 })
 
-/* =======================
-   REFS / STATE
-======================= */
 const pixiContainer = ref(null)
 const initialized = ref(false)
 const cellSize = ref(28)
@@ -30,10 +26,9 @@ let viewport = null
 let mapContainer = null
 let rover = null
 let pathGraphics = null
+let textureMap = {}
+let cellNodes = []
 
-/* =======================
-   CONSTANTS
-======================= */
 const PADDING = 30
 
 const texturePaths = {
@@ -49,9 +44,6 @@ function getGrid() {
   return Array.isArray(props.mapMatrix) ? props.mapMatrix : []
 }
 
-/* =======================
-   MOUNT
-======================= */
 onMounted(async () => {
   if (!pixiContainer.value) return
 
@@ -96,9 +88,8 @@ onMounted(async () => {
   mapContainer = new PIXI.Container()
   viewport.addChild(mapContainer)
 
-  const textureMap = await loadTexturesWithFallback()
-
-  drawGrid(mapContainer, textureMap, grid)
+  textureMap = await loadTexturesWithFallback()
+  drawGrid(grid)
 
   pathGraphics = new PIXI.Graphics()
   mapContainer.addChild(pathGraphics)
@@ -127,25 +118,22 @@ onUnmounted(() => {
   if (app) app.destroy(true, { children: true })
 })
 
-/* =======================
-   TEXTURE LOAD + FALLBACK
-======================= */
 async function loadTexturesWithFallback() {
-  const textureMap = {}
+  const map = {}
   const loadPromises = []
 
   for (const [type, path] of Object.entries(texturePaths)) {
     if (!path) {
-      textureMap[type] = null
+      map[type] = null
       continue
     }
 
     const promise = Assets.load(path)
       .then(texture => {
-        textureMap[type] = texture
+        map[type] = texture
       })
       .catch(() => {
-        textureMap[type] = null
+        map[type] = null
       })
 
     loadPromises.push(promise)
@@ -153,49 +141,84 @@ async function loadTexturesWithFallback() {
 
   await Promise.allSettled(loadPromises)
 
-  return textureMap
+  return map
 }
 
-/* =======================
-   GRID - texture or fallback color
-======================= */
-function drawGrid(container, textureMap, grid) {
+function createCell(type, x, y) {
+  const texture = textureMap[type]
+  let cell
+
+  if (texture) {
+    cell = new PIXI.Sprite(texture)
+    cell.width = cellSize.value - 2
+    cell.height = cellSize.value - 2
+    cell.position.set(
+      x * cellSize.value + PADDING + 1,
+      y * cellSize.value + PADDING + 1
+    )
+  } else {
+    cell = new PIXI.Graphics()
+    cell
+      .roundRect(
+        x * cellSize.value + PADDING,
+        y * cellSize.value + PADDING,
+        cellSize.value - 2,
+        cellSize.value - 2,
+        4
+      )
+      .fill(getCellColor(type))
+  }
+
+  cell.cellType = type
+  cell.gridX = x
+  cell.gridY = y
+  return cell
+}
+
+function drawGrid(grid) {
   const rows = grid.length
   const cols = grid[0].length
 
+  cellNodes = Array.from({ length: rows }, () => Array(cols).fill(null))
+
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const type = grid[y][x]
-      const texture = textureMap[type]
+      const cell = createCell(grid[y][x], x, y)
+      cellNodes[y][x] = cell
+      mapContainer.addChild(cell)
+    }
+  }
+}
 
-      let cell
+function syncGrid(grid) {
+  if (!mapContainer || !grid.length || !grid[0]?.length) return
 
-      if (texture) {
-        cell = new PIXI.Sprite(texture)
-        cell.width = cellSize.value - 2
-        cell.height = cellSize.value - 2
-        cell.position.set(
-          x * cellSize.value + PADDING + 1,
-          y * cellSize.value + PADDING + 1
-        )
-      } else {
-        cell = new PIXI.Graphics()
-        cell
-          .roundRect(
-            x * cellSize.value + PADDING,
-            y * cellSize.value + PADDING,
-            cellSize.value - 2,
-            cellSize.value - 2,
-            4
-          )
-          .fill(getCellColor(type))
+  const rows = grid.length
+  const cols = grid[0].length
+
+  if (cellNodes.length !== rows || (cellNodes[0] && cellNodes[0].length !== cols)) {
+    for (const row of cellNodes) {
+      for (const node of row) {
+        if (node) mapContainer.removeChild(node)
       }
+    }
+    cellNodes = []
+    drawGrid(grid)
+    return
+  }
 
-      cell.cellType = type
-      cell.gridX = x
-      cell.gridY = y
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const nextType = grid[y][x]
+      const currentNode = cellNodes[y][x]
+      if (!currentNode) continue
+      if (currentNode.cellType === nextType) continue
 
-      container.addChild(cell)
+      const nextNode = createCell(nextType, x, y)
+      const currentIndex = mapContainer.getChildIndex(currentNode)
+      mapContainer.removeChild(currentNode)
+      mapContainer.addChildAt(nextNode, currentIndex)
+      cellNodes[y][x] = nextNode
     }
   }
 }
@@ -212,9 +235,6 @@ function getCellColor(type) {
   return colors[type] || 0x555555
 }
 
-/* =======================
-   ROVER
-======================= */
 function createRoverGraphics() {
   const cont = new PIXI.Container()
   const body = new PIXI.Graphics()
@@ -256,9 +276,6 @@ function updateRoverPosition(pos, instant = false) {
   requestAnimationFrame(animate)
 }
 
-/* =======================
-   PATH
-======================= */
 function drawPath() {
   if (!pathGraphics) return
   pathGraphics.clear()
@@ -272,7 +289,7 @@ function drawPath() {
 
     const next = {
       x: current.x + step.x,
-      y: current.y + step.y
+      y: current.y + step.y,
     }
 
     if (Math.abs(step.x) <= 1 && Math.abs(step.y) <= 1 && (step.x !== 0 || step.y !== 0)) {
@@ -292,9 +309,6 @@ function drawPath() {
   }
 }
 
-/* =======================
-   RESIZE
-======================= */
 function forceResize() {
   if (!app || !viewport || !pixiContainer.value) return
   const w = pixiContainer.value.clientWidth
@@ -306,9 +320,6 @@ function forceResize() {
   viewport.fitWorld(true)
 }
 
-/* =======================
-   WATCHERS
-======================= */
 watch(() => props.roverPosition, (newPos) => {
   if (initialized.value) {
     updateRoverPosition(newPos)
@@ -318,6 +329,12 @@ watch(() => props.roverPosition, (newPos) => {
 
 watch(() => props.pathPlan, () => {
   if (initialized.value) drawPath()
+}, { deep: true })
+
+watch(() => props.mapMatrix, (newMatrix) => {
+  if (!initialized.value) return
+  if (!Array.isArray(newMatrix) || !newMatrix.length || !newMatrix[0]?.length) return
+  syncGrid(newMatrix)
 }, { deep: true })
 </script>
 

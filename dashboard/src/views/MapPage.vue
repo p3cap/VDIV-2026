@@ -14,35 +14,30 @@ export default {
   },
 
   methods: {
-    // setup adatok egyszer - map
-    async fetchSetup() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/get_setup");
-        if (!response.ok) throw new Error("Hálózati hiba");
-
-        const data = await response.json();
-        this.setupData = data;
-      } catch (err) {
-        console.error("Hiba a setup adatok lekérésekor:", err);
-      }
-    },
-
     async fetchData() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/get_data");
-        if (!response.ok) throw new Error("Hálózati hiba");
+        const [setupResponse, dataResponse] = await Promise.all([
+          fetch("http://127.0.0.1:8000/get_setup"),
+          fetch("http://127.0.0.1:8000/get_data"),
+        ]);
 
-        const data = await response.json();
+        if (!setupResponse.ok || !dataResponse.ok) throw new Error("Hálózati hiba");
+
+        const [setup, data] = await Promise.all([
+          setupResponse.json(),
+          dataResponse.json(),
+        ]);
+
+        this.setupData = setup;
         this.dashboard = data;
         console.log("Frissítve:", data.rover_position);
       } catch (err) {
-        console.error("Hiba az adatok lekérésekor:", err);
+        console.error("Hiba a setup/live adatok lekérésekor:", err);
       }
     },
   },
 
-  async mounted() {
-    await this.fetchSetup();
+  mounted() {
     this.fetchData();
     this.polling = setInterval(this.fetchData, 1000);
   },
