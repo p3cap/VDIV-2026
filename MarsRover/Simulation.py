@@ -10,17 +10,21 @@ class Simulation:
 		self.sim_time_multiplier = sim_time_multiplier
 		self.day_hrs = day_hrs
 		self.night_hrs = night_hrs
+		self.is_running = True
 		
 		self.elapsed_hrs = 0.0
 		self.is_day = True # TODO make func for calculating elapsed times daynight cycle
 
 	def update(self, delta_hrs:float):
+		if not self.is_running: print("Simulation stopped"); return
 		self.elapsed_hrs += delta_hrs
 		
 		cycle = self.day_hrs + self.night_hrs
 		time_in_cycle = self.elapsed_hrs % cycle
 		
 		self.is_day = time_in_cycle < self.day_hrs
+
+		self.is_running = self.elapsed_hrs > self.run_hrs
 
 	def get_daytime_in_interval(self, start_hrs: float, end_hrs: float) -> float:
 		"""Calculate hours of daytime within [start_hrs, end_hrs) interval.

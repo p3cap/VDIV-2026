@@ -42,4 +42,13 @@ chmod +x setup/linux.sh
 - [Join the Figma Design plan board](https://www.figma.com/design/kszosmFP5rPWRPXjKashwm/Untitled?node-id=0-1&m=dev&t=HY3IaC9Xtn6jKFqw-1)
 
 ---
-## Használati Útmutató 
+## Használati Útmutató
+
+
+## TODO
+
+setupnál python interpreterre is figyelni kell
+add start rover.bat, start frontend.bat
+Mined  json
+update, globalize json packets from rover
+
