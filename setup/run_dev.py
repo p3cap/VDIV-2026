@@ -35,7 +35,7 @@ else:
     procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py", mars))
 
 # --- Start Server ---
-procs.append(new_terminal(f"{sys.executable} Server.py", mars))
+procs.append(new_terminal(f"{sys.executable} Server/Server.py", root))
 
 # --- Dashboard ---
 procs.append(new_terminal("npm run dev", dash))
