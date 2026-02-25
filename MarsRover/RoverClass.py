@@ -62,6 +62,12 @@ class Rover:
 		self.storage = {key: 0 for key in sim.map_obj.mineral_markers} # dict of minerals {"Mineral":amount}
 		self.distance_travelled = 0
 
+		#logging
+		self.logger_url = "http://127.0.0.1:8000" # deafult localhost for development
+		self.logs_per_hr = 0.5
+
+		#mined = [] # a lit for stroring mines metrials coords, for frontend packet optimisation
+
 # ---------------- ENERGY ----------------
 	# calculates energy used for movement
 	def movement_cost(self, delta_hrs: float):
@@ -142,8 +148,9 @@ class Rover:
 			cur = came_from[cur]
 
 		path.reverse()
-		return path
+		return path, len(path)
 
+	
 	def path_find_to(self, goal: Vector2):
 		if self.status != STATUS.IDLE: return
 
@@ -218,8 +225,9 @@ class Rover:
 
 # ---------- Server logging --------------
 
-	def send_log(self, url:str): # TODO REVISE!!!! Make it universal jsons, TEST ONLY
-		live_data = {
+	def send_log_to_server(self, url:str=""): # TODO REVISE!!!! Make it universal jsons, TEST ONLY
+		url = url if url else self.logger_url
+		live_data = { # read from json?
 			"time_of_day": self.sim.elapsed_hrs % (self.sim.day_hrs+self.sim.night_hrs),
 			"rover_position": self.pos._dict(),
 			"rover_battery": self.battery,
@@ -231,7 +239,7 @@ class Rover:
 			"path_plan": [v._dict() for v in self.path],
 		}
 		
-		setup_data = {
+		setup_data = { #read from json?
 			"day_hrs": self.sim.day_hrs,
 			"night_hrs": self.sim.night_hrs,
 			"run_hrs": self.sim.run_hrs,
@@ -254,11 +262,12 @@ class Rover:
 			"map_matrix": self.sim.map_obj.map_data
 		}
 
-		response_setup = requests.post(url+"/send_setup", json=setup_data) # setup data, should go under /send_setup
+		response_setup = requests.post(url+"/send_setup", json=setup_data) # separted for later possible packet optimizations
 		response_live = requests.post(url+"/send_data", json=live_data)
 		return response_setup, response_live
 
-	# ---------- Print Formatter --------------
+
+	# ---------- Self print Formatter --------------
 	def __repr__(self):
 		line = "=" * 40
 		

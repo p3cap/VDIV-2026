@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import requests
 
 # Resolve imports when launched from project root or MachineLearning folder.
 ML_DIR = Path(__file__).resolve().parent
