@@ -1,13 +1,12 @@
-<script>
+<script setup>
+import { RouterView } from 'vue-router';
+import NavComponent from './components/NavComponent.vue';
 
 </script>
 
 <template>
   <router-view />
-    <nav>
-    <RouterLink to="/">főoldal</RouterLink>
-    <RouterLink to="/dashboard">dashboard</RouterLink>
-  </nav>
+  <NavComponent />
 </template>
 
 <style>
@@ -17,5 +16,6 @@ body {
   font-family: system-ui, Arial, sans-serif;
   background: black;
   color: white;
+
 }
 </style>

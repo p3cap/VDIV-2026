@@ -50,8 +50,6 @@ export default {
 
 <template>
   <div class="map-container">
-    <h1>Mars térkép haha</h1>
-
     <MapComponent
       v-if="dashboard && setupData?.map_matrix?.length"
       :roverPosition="dashboard.rover_position"
@@ -72,5 +70,13 @@ h1 {
 .loader {
   text-align: center;
   padding: 50px;
+}
+.map-container{
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
 }
 </style>
