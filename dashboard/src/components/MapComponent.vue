@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="map-wrapper">
     <div ref="pixiContainer" class="pixi-container"></div>
   </div>
@@ -9,17 +9,14 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
-import marsMap from '@/data/marsMap.json'
 import testpng from '@/assets/textures/pttt_logo_mini.png'
-/* PROPS */
+
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
   pathPlan: { type: Array, default: () => [] },
+  mapMatrix: { type: Array, default: () => [] },
 })
 
-/* =======================
-   REFS / STATE
-======================= */
 const pixiContainer = ref(null)
 const initialized = ref(false)
 const cellSize = ref(28)
@@ -29,29 +26,29 @@ let viewport = null
 let mapContainer = null
 let rover = null
 let pathGraphics = null
+let textureMap = {}
+let cellNodes = []
 
-/* =======================
-   CONSTANTS
-======================= */
 const PADDING = 30
 
-// ─── ITT KELL CSAK MÓDOSÍTANOD ────────────────────────────────
-// Minden típus → textúra elérési útja (relatív a public mappához vagy src/assets-hez)
 const texturePaths = {
-  '.': testpng,          // vagy '@/assets/textures/dirt.png' – attól függ, mit használsz
+  '.': testpng,
   '#': '/textures/rock.png',
   'B': '/textures/blue-crystal.png',
   'Y': '/textures/yellow-gem.png',
   'G': '/textures/green-plant.png',
   'S': '/textures/sand.png',
-  // ha új típus jön, csak ide írd be az utat
 }
 
-/* =======================
-   MOUNT
-======================= */
+function getGrid() {
+  return Array.isArray(props.mapMatrix) ? props.mapMatrix : []
+}
+
 onMounted(async () => {
   if (!pixiContainer.value) return
+
+  const grid = getGrid()
+  if (!grid.length || !grid[0]?.length) return
 
   app = new PIXI.Application()
 
@@ -65,8 +62,8 @@ onMounted(async () => {
 
   pixiContainer.value.appendChild(app.canvas)
 
-  const cols = marsMap.grid[0].length
-  const rows = marsMap.grid.length
+  const cols = grid[0].length
+  const rows = grid.length
   const worldW = cols * cellSize.value + PADDING * 2
   const worldH = rows * cellSize.value + PADDING * 2
 
@@ -91,10 +88,8 @@ onMounted(async () => {
   mapContainer = new PIXI.Container()
   viewport.addChild(mapContainer)
 
-  // Textúrák betöltése + fallback logika
-  const textureMap = await loadTexturesWithFallback()
-
-  drawGrid(mapContainer, textureMap)
+  textureMap = await loadTexturesWithFallback()
+  drawGrid(grid)
 
   pathGraphics = new PIXI.Graphics()
   mapContainer.addChild(pathGraphics)
@@ -123,85 +118,107 @@ onUnmounted(() => {
   if (app) app.destroy(true, { children: true })
 })
 
-/* =======================
-   TEXTÚRA BETÖLTÉS + FALLBACK
-======================= */
 async function loadTexturesWithFallback() {
-  const textureMap = {}           // type → PIXI.Texture | null
+  const map = {}
   const loadPromises = []
 
   for (const [type, path] of Object.entries(texturePaths)) {
     if (!path) {
-      textureMap[type] = null
+      map[type] = null
       continue
     }
 
     const promise = Assets.load(path)
       .then(texture => {
-        textureMap[type] = texture
-        console.log(`Textúra betöltve: ${type} → ${path}`)
+        map[type] = texture
       })
-      .catch(err => {
-        console.warn(`Textúra betöltési hiba (${type}): ${path}`, err)
-        textureMap[type] = null   // → fallback a drawGrid-ben
+      .catch(() => {
+        map[type] = null
       })
 
     loadPromises.push(promise)
   }
 
-  // Megvárjuk az összeset, de nem áll le, ha van hiba
   await Promise.allSettled(loadPromises)
 
-  return textureMap
+  return map
 }
 
-/* =======================
-   GRID – textúra vagy fallback szín
-======================= */
-function drawGrid(container, textureMap) {
-  const rows = marsMap.grid.length
-  const cols = marsMap.grid[0].length
+function createCell(type, x, y) {
+  const texture = textureMap[type]
+  let cell
+
+  if (texture) {
+    cell = new PIXI.Sprite(texture)
+    cell.width = cellSize.value - 2
+    cell.height = cellSize.value - 2
+    cell.position.set(
+      x * cellSize.value + PADDING + 1,
+      y * cellSize.value + PADDING + 1
+    )
+  } else {
+    cell = new PIXI.Graphics()
+    cell
+      .roundRect(
+        x * cellSize.value + PADDING,
+        y * cellSize.value + PADDING,
+        cellSize.value - 2,
+        cellSize.value - 2,
+        4
+      )
+      .fill(getCellColor(type))
+  }
+
+  cell.cellType = type
+  cell.gridX = x
+  cell.gridY = y
+  return cell
+}
+
+function drawGrid(grid) {
+  const rows = grid.length
+  const cols = grid[0].length
+
+  cellNodes = Array.from({ length: rows }, () => Array(cols).fill(null))
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const type = marsMap.grid[y][x]
-      const texture = textureMap[type]   // lehet null
+      const cell = createCell(grid[y][x], x, y)
+      cellNodes[y][x] = cell
+      mapContainer.addChild(cell)
+    }
+  }
+}
 
-      let cell
+function syncGrid(grid) {
+  if (!mapContainer || !grid.length || !grid[0]?.length) return
 
-      if (texture) {
-        // Textúrás verzió
-        cell = new PIXI.Sprite(texture)
-        cell.width = cellSize.value - 2
-        cell.height = cellSize.value - 2
-        cell.position.set(
-          x * cellSize.value + PADDING + 1,
-          y * cellSize.value + PADDING + 1
-        )
+  const rows = grid.length
+  const cols = grid[0].length
 
-        // Opcionális: ha pixeles / blurry kell lenni
-        // cell.texture.source.scaleMode = 'nearest'
-
-      } else {
-        // Fallback: régi színes Graphics
-        cell = new PIXI.Graphics()
-        cell
-          .roundRect(
-            x * cellSize.value + PADDING,
-            y * cellSize.value + PADDING,
-            cellSize.value - 2,
-            cellSize.value - 2,
-            4
-          )
-          .fill(getCellColor(type))
+  if (cellNodes.length !== rows || (cellNodes[0] && cellNodes[0].length !== cols)) {
+    for (const row of cellNodes) {
+      for (const node of row) {
+        if (node) mapContainer.removeChild(node)
       }
+    }
+    cellNodes = []
+    drawGrid(grid)
+    return
+  }
 
-      // Kereshetővé tesszük később is
-      cell.cellType = type
-      cell.gridX = x
-      cell.gridY = y
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const nextType = grid[y][x]
+      const currentNode = cellNodes[y][x]
+      if (!currentNode) continue
+      if (currentNode.cellType === nextType) continue
 
-      container.addChild(cell)
+      const nextNode = createCell(nextType, x, y)
+      const currentIndex = mapContainer.getChildIndex(currentNode)
+      mapContainer.removeChild(currentNode)
+      mapContainer.addChildAt(nextNode, currentIndex)
+      cellNodes[y][x] = nextNode
     }
   }
 }
@@ -218,9 +235,6 @@ function getCellColor(type) {
   return colors[type] || 0x555555
 }
 
-/* =======================
-   ROVER (változatlan)
-======================= */
 function createRoverGraphics() {
   const cont = new PIXI.Container()
   const body = new PIXI.Graphics()
@@ -247,7 +261,8 @@ function updateRoverPosition(pos, instant = false) {
     return
   }
 
-  const sx = rover.x, sy = rover.y
+  const sx = rover.x
+  const sy = rover.y
   const start = performance.now()
   const duration = 300
 
@@ -261,9 +276,6 @@ function updateRoverPosition(pos, instant = false) {
   requestAnimationFrame(animate)
 }
 
-/* =======================
-   PATH (változatlan)
-======================= */
 function drawPath() {
   if (!pathGraphics) return
   pathGraphics.clear()
@@ -277,7 +289,7 @@ function drawPath() {
 
     const next = {
       x: current.x + step.x,
-      y: current.y + step.y
+      y: current.y + step.y,
     }
 
     if (Math.abs(step.x) <= 1 && Math.abs(step.y) <= 1 && (step.x !== 0 || step.y !== 0)) {
@@ -297,9 +309,6 @@ function drawPath() {
   }
 }
 
-/* =======================
-   RESIZE (változatlan)
-======================= */
 function forceResize() {
   if (!app || !viewport || !pixiContainer.value) return
   const w = pixiContainer.value.clientWidth
@@ -311,9 +320,6 @@ function forceResize() {
   viewport.fitWorld(true)
 }
 
-/* =======================
-   WATCHERS (változatlan)
-======================= */
 watch(() => props.roverPosition, (newPos) => {
   if (initialized.value) {
     updateRoverPosition(newPos)
@@ -323,6 +329,12 @@ watch(() => props.roverPosition, (newPos) => {
 
 watch(() => props.pathPlan, () => {
   if (initialized.value) drawPath()
+}, { deep: true })
+
+watch(() => props.mapMatrix, (newMatrix) => {
+  if (!initialized.value) return
+  if (!Array.isArray(newMatrix) || !newMatrix.length || !newMatrix[0]?.length) return
+  syncGrid(newMatrix)
 }, { deep: true })
 </script>
 

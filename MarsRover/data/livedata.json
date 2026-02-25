@@ -22,5 +22,6 @@
   ],
   
   "rover_energy_consumption": 5.0,
-  "rover_energy_produce": 10.0
+  "rover_energy_produce": 10.0,
+  "mined": [{"x":1,"y":0}]
 }

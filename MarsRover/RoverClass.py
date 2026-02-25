@@ -2,6 +2,7 @@ from MapClass import Map
 from Simulation import Simulation
 from Global import Vector2
 
+import requests
 import heapq
 import numpy as np
 from typing import List
@@ -61,6 +62,12 @@ class Rover:
 		self.storage = {key: 0 for key in sim.map_obj.mineral_markers} # dict of minerals {"Mineral":amount}
 		self.distance_travelled = 0
 
+		#logging
+		self.logger_url = "http://127.0.0.1:8000" # deafult localhost for development
+		self.logs_per_hr = 0.5
+
+		#mined = [] # a lit for stroring mines metrials coords, for frontend packet optimisation
+
 # ---------------- ENERGY ----------------
 	# calculates energy used for movement
 	def movement_cost(self, delta_hrs: float):
@@ -110,7 +117,7 @@ class Rover:
 				result.append(n)
 		return result
 
-	def astar(self, start: Vector2, goal: Vector2): # TODO REVISE!!!!!!!!!!!!!!!!
+	def astar(self, start: Vector2, goal: Vector2): # TODO REVISE!!!!!!!!!!!!!!!! a cucc nem mindig találja meg a legjobbat
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
@@ -141,8 +148,9 @@ class Rover:
 			cur = came_from[cur]
 
 		path.reverse()
-		return path
+		return path, len(path)
 
+	
 	def path_find_to(self, goal: Vector2):
 		if self.status != STATUS.IDLE: return
 
@@ -161,6 +169,8 @@ class Rover:
 		self.path = dirs
 		self.status = STATUS.MOVE
 
+		return len(dirs)
+
 # ---------------- MINING ----------------
 
 	def mine(self):
@@ -174,7 +184,8 @@ class Rover:
 # ---------------- FRAME UPDATE ----------------
 
 	def update(self, delta_hrs:float):
-		if delta_hrs <= 0: return
+		if not self.sim.is_running: print("Rover stopped: Simulation not running"); return
+		if delta_hrs <= 0: return # don't calcaute for no reason
 
 		if self.status == STATUS.MOVE and self.path:
 			self.move_progress += self.gear.value * delta_hrs
@@ -194,7 +205,7 @@ class Rover:
 			self.mine_process_hrs -= delta_hrs
 			if self.mine_process_hrs <= 0:
 				self.status = STATUS.IDLE
-				self.sim.map_obj.set_tile(self.pos,self.sim.map_obj.path_marker) # mark map pos as cleared
+				self.sim.map_obj.set_tile(self.pos, self.sim.map_obj.path_marker) # mark map pos as cleared
 		
 		else:
 			self.status = STATUS.IDLE
@@ -211,7 +222,52 @@ class Rover:
 		if self.battery <= 0:
 			self.status = STATUS.DEAD
 
-# ---------- Print Formatter --------------
+
+# ---------- Server logging --------------
+
+	def send_log_to_server(self, url:str=""): # TODO REVISE!!!! Make it universal jsons, TEST ONLY
+		url = url if url else self.logger_url
+		live_data = { # read from json?
+			"time_of_day": self.sim.elapsed_hrs % (self.sim.day_hrs+self.sim.night_hrs),
+			"rover_position": self.pos._dict(),
+			"rover_battery": self.battery,
+			"rover_storage": self.storage,
+			"speed": self.gear.value,
+			"status": self.status.name,
+			"distance_travelled": self.distance_travelled,
+			"mine_process_hrs": self.mine_process_hrs,
+			"path_plan": [v._dict() for v in self.path],
+		}
+		
+		setup_data = { #read from json?
+			"day_hrs": self.sim.day_hrs,
+			"night_hrs": self.sim.night_hrs,
+			"run_hrs": self.sim.run_hrs,
+			"sim_time_multiplier": self.sim.sim_time_multiplier,
+			"markers": { # TODO idk what about this, but not good yet, cuz no reference to other stuffz
+				"S": "Rover Start",
+				".": "Field",
+				"#": "Barrier",
+				"Y": "Gold",
+				"B": "Ice",
+				"G": "Green"
+			},
+			"rover_name": self.id,
+			"rover_max_battery": self.MAX_BATTERY_CHARGE,
+			"rover_mining_consumption_per_hr": self.MINING_CONSUMPTION_PER_HR,
+			"rover_standby_consumption_per_hr": self.STANDBY_CONSUMPTION_PER_HR,
+			"rover_charge_per_hr": self.DAY_CHARGE_PER_HR,
+			"rover_mine_hrs": self.MINING_TIME_HRS,
+			"rover_mode": "machine_learning", # Will be the type of algorythm used
+			"map_matrix": self.sim.map_obj.map_data
+		}
+
+		response_setup = requests.post(url+"/send_setup", json=setup_data) # separted for later possible packet optimizations
+		response_live = requests.post(url+"/send_data", json=live_data)
+		return response_setup, response_live
+
+
+	# ---------- Self print Formatter --------------
 	def __repr__(self):
 		line = "=" * 40
 		
