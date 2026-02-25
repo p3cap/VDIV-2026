@@ -1,5 +1,6 @@
 from MapClass import Map
 from Global import Vector2
+from typing import Optional
 
 MIN_RUN_HRS = 24.0
 
@@ -15,14 +16,44 @@ class Simulation:
 		self.elapsed_hrs = 0.0
 		self.is_day = True # TODO make func for calculating elapsed times daynight cycle
 
+	def reset(self):
+		self.elapsed_hrs = 0.0
+		self.is_day = True
+		self.is_running = True
+
+	def get_cycle_hrs(self) -> float:
+		return self.day_hrs + self.night_hrs
+
+	def get_time_in_cycle(self, elapsed_hrs: Optional[float] = None) -> float:
+		ref = self.elapsed_hrs if elapsed_hrs is None else elapsed_hrs
+		return ref % self.get_cycle_hrs()
+
+	def is_day_at(self, elapsed_hrs: Optional[float] = None) -> bool:
+		return self.get_time_in_cycle(elapsed_hrs) < self.day_hrs
+
+	def remaining_hrs(self) -> float:
+		return max(0.0, self.run_hrs - self.elapsed_hrs)
+
+	def get_context(self) -> dict:
+		"""Compact simulation snapshot for ML state builders."""
+		return {
+			"elapsed_hrs": float(self.elapsed_hrs),
+			"run_hrs": float(self.run_hrs),
+			"remaining_hrs": float(self.remaining_hrs()),
+			"time_in_cycle": float(self.get_time_in_cycle()),
+			"cycle_hrs": float(self.get_cycle_hrs()),
+			"is_day": bool(self.is_day),
+			"is_running": bool(self.is_running),
+			"sim_time_multiplier": float(self.sim_time_multiplier),
+			"day_hrs": float(self.day_hrs),
+			"night_hrs": float(self.night_hrs),
+		}
+
 	def update(self, delta_hrs:float):
 		if not self.is_running: print("Simulation stopped"); return
 		self.elapsed_hrs += delta_hrs
 		
-		cycle = self.day_hrs + self.night_hrs
-		time_in_cycle = self.elapsed_hrs % cycle
-		
-		self.is_day = time_in_cycle < self.day_hrs
+		self.is_day = self.is_day_at(self.elapsed_hrs)
 
 		self.is_running = self.elapsed_hrs < self.run_hrs
 
