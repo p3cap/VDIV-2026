@@ -14,6 +14,14 @@ class Map:
 		self.mineral_markers = mineral_markers
 		self.width = len(map_data[0])
 		self.height = len(map_data)
+		self.marker_descriptions = {
+				"S": "Rover Start",
+				".": "Field",
+				"#": "Barrier",
+				"Y": "Gold",
+				"B": "Ice",
+				"G": "Green"
+		}
 
 	def get_poses_of_tile(self, tile_name:str, limit:int=-1):
 		found = []

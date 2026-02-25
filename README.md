@@ -41,7 +41,7 @@ Run server:
 ## TODO
 
 setupnál python interpreterre is figyelni kell
-add start rover.bat, start frontend.bat
+add start rover, start frontend
 Mined json
 update, globalize json packets from rover
 dev controlls in frontend should be secure?

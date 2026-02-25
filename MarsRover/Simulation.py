@@ -24,7 +24,7 @@ class Simulation:
 		
 		self.is_day = time_in_cycle < self.day_hrs
 
-		self.is_running = self.elapsed_hrs > self.run_hrs
+		self.is_running = self.elapsed_hrs < self.run_hrs
 
 	def get_daytime_in_interval(self, start_hrs: float, end_hrs: float) -> float:
 		"""Calculate hours of daytime within [start_hrs, end_hrs) interval.

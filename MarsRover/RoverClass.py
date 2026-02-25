@@ -2,7 +2,6 @@ from MapClass import Map
 from Simulation import Simulation
 from Global import Vector2
 
-import requests
 import heapq
 import numpy as np
 from typing import List
@@ -70,7 +69,7 @@ class Rover:
 
 # ---------------- ENERGY ----------------
 	# calculates energy used for movement
-	def movement_cost(self, delta_hrs: float):
+	def movement_cost(self, delta_hrs: float) -> float:
 		# all consatnts are in /hour calcuation for easier usage
 		# formula: 
 		# k * v^2 = 2 * half_hour_consumption^2 * half_hours_passed
@@ -79,7 +78,7 @@ class Rover:
 		return 2 * (speed_per_half_hr ** 2) * half_hours
 
 	# calculates energy used (has to be called every time before changing status)
-	def energy_consumed(self, delta_hrs:float):
+	def energy_consumed(self, delta_hrs:float) -> float:
 		match self.status:
 			case STATUS.MOVE:
 				return self.movement_cost(delta_hrs)
@@ -89,7 +88,7 @@ class Rover:
 				return self.STANDBY_CONSUMPTION_PER_HR * delta_hrs
 	
 	# calculates energy produced from solar during daytime
-	def energy_produced(self, delta_hrs: float):
+	def energy_produced(self, delta_hrs: float) -> float:
 		"""Calculate energy produced from solar panel during the interval.
 		
 		Uses Simulation's day/night cycle calculator to determine daytime hours.
@@ -101,10 +100,10 @@ class Rover:
 
 # ---------------- A* PATHFINDING ----------------
 
-	def heuristic(self, a:Vector2, b:Vector2):
+	def heuristic(self, a:Vector2, b:Vector2) -> int:
 		return abs(a.x - b.x) + abs(a.y - b.y)
 
-	def get_neighbors(self, node:Vector2):
+	def get_neighbors(self, node:Vector2) -> list[Vector2]:
 		dirs = [
 			(-1,0),(1,0),(0,-1),(0,1),
 			(-1,-1),(-1,1),(1,-1),(1,1)
@@ -117,7 +116,11 @@ class Rover:
 				result.append(n)
 		return result
 
-	def astar(self, start: Vector2, goal: Vector2): # TODO REVISE!!!!!!!!!!!!!!!! a cucc nem mindig találja meg a legjobbat
+	def astar(self, start: Vector2, goal: Vector2):
+		if isinstance(start, (tuple, list)):
+			start = Vector2(start[0], start[1])
+		if isinstance(goal, (tuple, list)):
+			goal = Vector2(goal[0], goal[1]) # TODO REVISE!!!!!!!!!!!!!!!! a cucc nem mindig találja meg a legjobbat
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
@@ -151,11 +154,13 @@ class Rover:
 		return path, len(path)
 
 	
-	def path_find_to(self, goal: Vector2):
+	def path_find_to(self, goal: Vector2) -> list[Vector2]:
 		if self.status != STATUS.IDLE: return
+		if isinstance(goal, (tuple, list)):
+			goal = Vector2(goal[0], goal[1])
 
 		start = self.pos
-		absolute_path = self.astar(start, goal)
+		absolute_path, _ = self.astar(start, goal)
 		dirs = []
 		prev = start
 
@@ -169,7 +174,7 @@ class Rover:
 		self.path = dirs
 		self.status = STATUS.MOVE
 
-		return len(dirs)
+		return dirs
 
 # ---------------- MINING ----------------
 
@@ -225,47 +230,39 @@ class Rover:
 
 # ---------- Server logging --------------
 
-	def send_log_to_server(self, url:str=""): # TODO REVISE!!!! Make it universal jsons, TEST ONLY
-		url = url if url else self.logger_url
-		live_data = { # read from json?
+	def get_live_data(self, delta_hrs : float) -> dict:
+		consumed = self.energy_consumed(delta_hrs)
+		produced = self.energy_produced(delta_hrs)
+		return {
 			"time_of_day": self.sim.elapsed_hrs % (self.sim.day_hrs+self.sim.night_hrs),
+			"elapsed_hrs": self.sim.elapsed_hrs,
 			"rover_position": self.pos._dict(),
 			"rover_battery": self.battery,
 			"rover_storage": self.storage,
 			"speed": self.gear.value,
 			"status": self.status.name,
 			"distance_travelled": self.distance_travelled,
-			"mine_process_hrs": self.mine_process_hrs,
 			"path_plan": [v._dict() for v in self.path],
+			"rover_energy_consumption" : consumed,
+			"rover_energy_production" : produced,
 		}
-		
-		setup_data = { #read from json?
+
+	def get_setup_data(self) -> dict:
+		return {
+			"map_matrix": self.sim.map_obj.map_data,
 			"day_hrs": self.sim.day_hrs,
 			"night_hrs": self.sim.night_hrs,
 			"run_hrs": self.sim.run_hrs,
 			"sim_time_multiplier": self.sim.sim_time_multiplier,
-			"markers": { # TODO idk what about this, but not good yet, cuz no reference to other stuffz
-				"S": "Rover Start",
-				".": "Field",
-				"#": "Barrier",
-				"Y": "Gold",
-				"B": "Ice",
-				"G": "Green"
-			},
+			"markers" : self.sim.map_obj.marker_descriptions,
 			"rover_name": self.id,
 			"rover_max_battery": self.MAX_BATTERY_CHARGE,
 			"rover_mining_consumption_per_hr": self.MINING_CONSUMPTION_PER_HR,
 			"rover_standby_consumption_per_hr": self.STANDBY_CONSUMPTION_PER_HR,
 			"rover_charge_per_hr": self.DAY_CHARGE_PER_HR,
 			"rover_mine_hrs": self.MINING_TIME_HRS,
-			"rover_mode": "machine_learning", # Will be the type of algorythm used
-			"map_matrix": self.sim.map_obj.map_data
+			"rover_mode": "machine_learning", # Will be the type of algory
 		}
-
-		response_setup = requests.post(url+"/send_setup", json=setup_data) # separted for later possible packet optimizations
-		response_live = requests.post(url+"/send_data", json=live_data)
-		return response_setup, response_live
-
 
 	# ---------- Self print Formatter --------------
 	def __repr__(self):

@@ -7,7 +7,7 @@ import numpy as np
 
 from dqn_lib import DQNAgent, DQNTrainer
 
-from Global import Vector2
+from Global import Vector2, MARS_ROVER_PATH
 from MapClass import Map, matrix_from_csv
 from RoverClass import Rover, STATUS, GEARS
 from Simulation import Simulation
@@ -156,7 +156,7 @@ class RoverDQNEnv:
 
 
 if __name__ == "__main__":
-    env = RoverDQNEnv(map_csv=str(ROOT_DIR / "data" / "mars_map_50x50.csv"), run_hrs=24.0, delta_hrs=0.5)
+    env = RoverDQNEnv(map_csv=str(MARS_ROVER_PATH / "data" / "mars_map_50x50.csv"), run_hrs=24.0, delta_hrs=0.5)
 
     state_dim = len(env.reset())
     action_dim = 3
@@ -191,13 +191,13 @@ if __name__ == "__main__":
         eval_every=0,
     )
 
-    out_path = ROOT_DIR / "MachineLearning" / "trained" / "rover_dqn.pth"
+    out_path = MARS_ROVER_PATH / "MachineLearning" / "trained" / "rover_dqn.pth"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     agent.save(str(out_path))
     print(f"Saved rover model to: {out_path}")
 
     # Greedy test rollout
-    test_env = RoverDQNEnv(map_csv=str(ROOT_DIR / "data" / "mars_map_50x50.csv"), run_hrs=24.0, delta_hrs=0.5)
+    test_env = RoverDQNEnv(map_csv=str(MARS_ROVER_PATH / "data" / "mars_map_50x50.csv"), run_hrs=24.0, delta_hrs=0.5)
     state = test_env.reset()
     done = False
     total_reward = 0.0
