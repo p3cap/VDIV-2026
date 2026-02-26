@@ -40,3 +40,6 @@ def install_depedenices():
     print(f"{GREEN}Dashboard dependencies installed!{RESET}\n")
 
     print(f"{GREEN}Dependency installation succesful!{RESET}")
+
+if __name__ == "__main__":
+    install_depedenices()
