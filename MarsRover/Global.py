@@ -1,3 +1,7 @@
+from pathlib import Path
+
+MARS_ROVER_PATH = Path(__file__).parent
+
 class Vector2():
 	def __init__(self, x:int, y:int):
 		self.x = x
@@ -16,4 +20,4 @@ class Vector2():
 		return hash((self.x,self.y))
 
 	def __repr__(self): # for print
-		return f"({self.x},{self.y})"
+		return f"Vector2({self.x},{self.y})"

@@ -53,3 +53,9 @@ function addRandomGradually() {
     <HeatMap />
   </div>
 </template>
+<style scoped>
+div{
+  display: grid;
+  grid-row: 4;
+}
+</style>

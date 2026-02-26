@@ -10,6 +10,9 @@ import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
 import testpng from '@/assets/textures/pttt_logo_mini.png'
+import t, { getLanguage, setLanguage } from '@/data/translate'
+
+
 
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
@@ -344,11 +347,10 @@ watch(() => props.mapMatrix, (newMatrix) => {
   justify-content: center;
   align-items: center;
   width: 60vw;
-  max-width: 1600px;
   height: 85vh;
   margin: 0 auto;
   background: #1a1a2e;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   flex: none;

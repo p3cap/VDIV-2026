@@ -2,12 +2,14 @@ import time, os, requests, random
 from Simulation import Simulation
 from RoverClass import Rover, STATUS, GEARS
 from MapClass import Map, matrix_from_csv
-from Global import Vector2
+from Global import Vector2, MARS_ROVER_PATH
+from RoverLogger import RoverLogger
 
 url = "http://127.0.0.1:8000" # TODO make universal
 
+
 map_obj = Map(
-	map_data = matrix_from_csv(r"MarsRover/data/mars_map_50x50.csv") # TODO make universal
+	map_data = matrix_from_csv(MARS_ROVER_PATH+r"/data/mars_map_50x50.csv") # TODO make universal
 )
 
 sim = Simulation(
@@ -22,6 +24,11 @@ rover = Rover(
 	id = "test_rover",
 	sim = sim
 )
+logger = RoverLogger(url)
+logger.send_setup(rover.get_setup_data())
+
+
+
 
 # -- test run --
 
@@ -51,6 +58,8 @@ while True:
 	#print(rover)
 	# print(sim)
 
+	#send live data 
+	logger.send_live(rover.get_live_data(delta_hrs))
 	# TEST ONLY json server packet
 
 	rover.send_log(url)

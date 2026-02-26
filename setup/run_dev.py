@@ -28,10 +28,10 @@ def new_terminal(cmd, cwd):
 
 
 # --- Choose mode ---
-mode = questionary.select("Select mode:", choices=["test", "ai"]).ask()
+mode = questionary.select("Select mode:", choices=["test", "ai", "none"]).ask()
 if mode == "test":
     procs.append(new_terminal(f"{sys.executable} main.py", mars))
-else:
+elif mode == "ai":
     procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py", mars))
 
 # --- Start Server ---
