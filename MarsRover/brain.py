@@ -66,9 +66,6 @@ def ercek_a_mapon():
 def tavolsagok():
     tavolsag_lista.clear()
 
-    rover_x = rover.pos.x
-    rover_y = rover.pos.y
-
     for ore_x,ore_y in ercek_helye:
         path, length = rover.astar(rover.pos, Vector2(ore_x,ore_y))  # astar -> (path, len(path))
         tavolsag_lista.append([[ore_x,ore_y], length])    
@@ -82,22 +79,31 @@ def legkozelebbi_erc():
 print(map_obj.map_data)
 
 ercek_a_mapon()
-tavolsagok()
+
 
 
 
 def serverpost():
     sim.update(0.5)
     rover.update(0.5)
-    rover.send_log_to_server()
     time.sleep(1)
 
 
 rover.pos = Vector2(0,0)
 
 while(rover.battery != 0):  
+    tavolsagok()
     leg = legkozelebbi_erc()
     print(leg)
+
     # leg is stored as (x, y, distance)
     rover.path_find_to(Vector2(leg[0][0], leg[0][1]))
+
+    if rover.path == []:
+        rover.mine()
+        if rover.status != STATUS.MINE:
+            tavolsag_lista.pop(0)
+
     serverpost()
+    
+
