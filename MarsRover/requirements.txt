@@ -29,3 +29,6 @@ typing_extensions==4.15.0
 urllib3==2.6.3
 uvicorn==0.41.0
 wcwidth==0.6.0
+gymnasium==0.29.1
+stable-baselines3==2.2.1
+cloudpickle==3.0.0
