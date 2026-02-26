@@ -344,11 +344,10 @@ watch(() => props.mapMatrix, (newMatrix) => {
   justify-content: center;
   align-items: center;
   width: 60vw;
-  max-width: 1600px;
   height: 85vh;
   margin: 0 auto;
   background: #1a1a2e;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   flex: none;
