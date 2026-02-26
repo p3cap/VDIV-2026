@@ -1,88 +1,85 @@
+"""
+Simple DQN rover-like example with 2 input features (state dim=2), 2 outputs (action dim=2), and basic reward.
+Uses the dqn_lib for structure.
+
+Environment: Simplified rover on 1D line (position 0-4, start 0, goal 4).
+State: [position_norm, battery_norm].
+Actions: 0 (wait/charge), 1 (move forward).
+Reward: -0.01 per step, +1 at goal, -0.5 if battery low.
+Battery drains on move, charges on wait.
+"""
+
 import numpy as np
-import random
-from typing import Tuple, Optional, Sequence
-from dqn_lib import DQNTrainer, DQNAgent, ReplayBuffer
+from dqn_lib import DQNAgent, DQNTrainer, BaseDQNEnv, FeatureSpec, ActionSpec
+from typing import Optional  
 
-
-# ---------------------------
-# Small demo environment: AddEnv (same as yours)
-# ---------------------------
-class AddEnv:
-    """
-    Simple one-step environment:
-    state: [a/9, b/9] where a,b in 0..9
-    action: predicted sum in 0..18
-    reward: +1 if correct, -1 otherwise
-    """
+class SimpleRoverEnv(BaseDQNEnv):
     def __init__(self):
-        self.max_value = 9
-        self._state = None
+        self.steps = 0
+        self.max_steps = 20
+        self.feature_specs = self._default_feature_specs()
+        self.action_specs = self._default_action_specs()
+        self.closest_mineral_monitor_amount = 30
 
-    def reset(self):
-        self.a = random.randint(0, self.max_value)
-        self.b = random.randint(0, self.max_value)
-        self._state = np.array([self.a / 9.0, self.b / 9.0], dtype=np.float32)
-        return self._state
+    def _default_feature_specs(self):
+        return [
+            FeatureSpec("input_1", lambda env: env.position / (env.line_length - 1)),  # position_norm
+            FeatureSpec("input_2", lambda env: env.battery / env.max_battery),  # battery_norm
+        ]
 
-    def step(self, action: int) -> Tuple[Optional[np.ndarray], float, bool]:
-        correct = (action == (self.a + self.b))
-        reward = 1.0 if correct else -1.0
-        done = True
-        return None, reward, done
+    def _default_action_specs(self):
+        return [
+            ActionSpec("goto_mineral_index", lambda env: ), 
+            ActionSpec("set_gear", lambda env: ), 
+            ActionSpec("mine", lambda env:), 
 
-# ---------------------------
-# Demo script (runs when executed directly)
-# ---------------------------
+        ]
+
+    def reset(self) -> np.ndarray:
+        self.position = 0.0
+        self.battery = self.max_battery
+        self.steps = 0
+        return self._build_state()
+
+    def step(self, action: int) -> tuple[Optional[np.ndarray], float, bool]:
+        base_reward = self.action_specs[action].handler(self) if 0 <= action < len(self.action_specs) else -0.5
+
+        self.steps += 1
+        done = self.position >= self.line_length - 1 or self.battery <= 0 or self.steps >= self.max_steps
+
+        reward = base_reward
+        if self.position >= self.line_length - 1:
+            reward += 1.0
+        if self.battery <= 0:
+            reward -= 0.5
+
+        next_state = None if done else self._build_state()
+        return next_state, reward, done
+
+
+    def _action_move(self) -> float: # retrun score after input?
+        if self.battery <= 0:
+            return -0.5  # invalid
+        return -0.01  # small time penalty
+
 if __name__ == "__main__":
-    # Demo: train DQN on AddEnv until 100% eval accuracy or max episodes reached.
-    env = AddEnv()
-    state_dim = 2
-    action_dim = 19
+    env = SimpleRoverEnv()
+    agent = DQNAgent(state_dim=2, action_dim=2)
+    trainer = DQNTrainer(env, agent)
 
-    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99, hidden_sizes=(128, 128))
-    trainer = DQNTrainer(
-        env,
-        agent,
-        buffer_size=2000,
-        batch_size=128,
-        initial_exploration=100,
-        train_frequency=1,
-        target_update_freq=500,
-        min_buffer_size_to_learn=200
-    )
+    # Train
+    stats = trainer.train(max_episodes=500, verbose=1)
 
-    print("Starting training (demo on AddEnv). This may take a bit.")
-    stats = trainer.train(
-        max_episodes=100000,
-        max_steps_per_episode=1,
-        epsilon_start=1.0,
-        epsilon_final=0.01,
-        epsilon_decay=0.995,
-        verbose=True,
-        eval_every=100,
-        eval_episodes=200
-    )
+    # Evaluate
+    print("Final eval avg reward:", trainer.evaluate(episodes=10))
 
-    # Save model
-    agent.save("dqn_add_demo.pth")
-    print("Model saved to dqn_add_demo.pth")
-
-    # Interactive test
-    agent.q_net.eval()
-    print("\nInteractive test (enter 'q' to quit). Inputs 0..9 only.")
-    while True:
-        s = input("Enter two ints 0-9 separated by space: ")
-        if s.lower().strip() == "q":
-            break
-        try:
-            a_str, b_str = s.strip().split()
-            a, b = int(a_str), int(b_str)
-            if not (0 <= a <= 9 and 0 <= b <= 9):
-                raise ValueError
-        except Exception:
-            print("Invalid input. Example: '3 7'")
-            continue
-
-        state = np.array([a / 9.0, b / 9.0], dtype=np.float32)
-        pred = agent.act(state, epsilon=0.0)
-        print(f"Predicted: {pred} | Correct: {a + b} | {'OK' if pred == a + b else 'WRONG'}")
+    # Sample rollout with reward check
+    state = env.reset()
+    total_reward = 0.0
+    done = False
+    while not done:
+        action = agent.act(state, epsilon=0.0)
+        state, reward, done = env.step(action)
+        total_reward += reward
+        print(f"Action: {action}, Reward: {reward}, State: {state if state is not None else 'Terminal'}")
+    print(f"Total reward: {total_reward}")

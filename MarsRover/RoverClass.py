@@ -1,6 +1,7 @@
 from MapClass import Map
 from Simulation import Simulation
 from Global import Vector2
+from RoverLogger import RoverLogger
 
 import heapq
 import numpy as np
@@ -39,7 +40,7 @@ class Rover:
 
 	K_MOVEMENT = 2  # k in E = k * v^2
 
-	def __init__(self, id:str, sim:Simulation):
+	def __init__(self, id:str, sim:Simulation, log_server_url:str="http://127.0.0.1:8000"):
 		self.id = id
 		self.sim = sim
 		
@@ -62,18 +63,14 @@ class Rover:
 		self.distance_travelled = 0
 
 		#logging
-		self.logger_url = "http://127.0.0.1:8000" # deafult localhost for development
-		self.logs_per_hr = 0.5
+		self.log_server_url = log_server_url # deafult localhost for development
+		self.log_freq_per_hr = 0.5
+		self.hrs_until_next_log = 0
+		self.logger_obj = RoverLogger(log_server_url)
 
 		#mined = [] # a lit for stroring mines metrials coords, for frontend packet optimisation
 
 # ---------------- CONTROL HELPERS ----------------
-	def to_vector2(self, pos) -> Vector2:
-		if isinstance(pos, Vector2):
-			return pos
-		if isinstance(pos, (tuple, list)) and len(pos) == 2:
-			return Vector2(int(pos[0]), int(pos[1]))
-		raise TypeError(f"Unsupported position type: {type(pos)}")
 
 	def _normalize_gear(self, gear=None) -> GEARS:
 		if gear is None:
@@ -107,13 +104,12 @@ class Rover:
 	def movement_cost(self, delta_hrs: float) -> float:
 		return self.movement_cost_for_gear(delta_hrs, self.gear)
 
-	def energy_consumed_for(self, delta_hrs: float, status: Optional[STATUS] = None, gear=None) -> float:
+	def energy_consumed(self, delta_hrs: float, status: STATUS = None, gear=None) -> float:
 		"""Estimated energy consumption for a status/gear combination."""
-		mode = self.status if status is None else status
-		if isinstance(mode, str):
-			mode = STATUS[mode.upper()]
+		status = self.status if not status else status
+		gear = self.gear if not gear else gear
 
-		match mode:
+		match status:
 			case STATUS.MOVE:
 				return self.movement_cost_for_gear(delta_hrs, gear)
 			case STATUS.MINE:
@@ -122,27 +118,16 @@ class Rover:
 				return self.STANDBY_CONSUMPTION_PER_HR * delta_hrs
 		return 0.0
 
-	def energy_consumed(self, delta_hrs:float) -> float:
-		return self.energy_consumed_for(delta_hrs, self.status, self.gear)
 
-	def energy_produced_between(self, start_hrs: float, end_hrs: float) -> float:
+	def energy_produced(self, delta_hrs: float) -> float:
+		start_hrs = self.sim.elapsed_hrs
+		end_hrs = start_hrs + delta_hrs
 		daytime = self.sim.get_daytime_in_interval(start_hrs, end_hrs)
 		return daytime * self.DAY_CHARGE_PER_HR
 
-	def energy_produced(self, delta_hrs: float) -> float:
-		start = self.sim.elapsed_hrs
-		end = start + delta_hrs
-		return self.energy_produced_between(start, end)
-
 # ---------------- A* PATHFINDING ----------------
 
-	def heuristic(self, a:Vector2, b:Vector2) -> int:
-		p1 = self.to_vector2(a)
-		p2 = self.to_vector2(b)
-		return abs(p1.x - p2.x) + abs(p1.y - p2.y)
-
 	def get_neighbors(self, node:Vector2) -> list[Vector2]:
-		node = self.to_vector2(node)
 		dirs = [
 			(-1,0),(1,0),(0,-1),(0,1),
 			(-1,-1),(-1,1),(1,-1),(1,1)
@@ -156,64 +141,50 @@ class Rover:
 		return result
 
 	def astar(self, start: Vector2, goal: Vector2):
-		start = self.to_vector2(start)
-		goal = self.to_vector2(goal)
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
 		came_from = {}
 		g_score = {start: 0}
+		closed_set = set()
 
 		while open_set:
-			_, current = heapq.heappop(open_set)
+				_, current = heapq.heappop(open_set)
 
-			if current == goal:
-				break
+				if current in closed_set: continue
+				if current == goal: break
 
-			for neighbor in self.get_neighbors(current):
-				tentative = g_score[current] + 16
+				closed_set.add(current)
 
-				if neighbor not in g_score or tentative < g_score[neighbor]:
-					came_from[neighbor] = current
-					g_score[neighbor] = tentative
-					f = tentative + self.heuristic(neighbor, goal)
-					heapq.heappush(open_set, (f, neighbor))
+				for neighbor in self.get_neighbors(current):
+						tentative = g_score[current] + 1  # cost = 1 per move
 
-		# reconstruct absolute path
+						if neighbor not in g_score or tentative < g_score[neighbor]:
+								came_from[neighbor] = current
+								g_score[neighbor] = tentative
+								f = tentative + neighbor.distance_to(goal)
+								heapq.heappush(open_set, (f, neighbor))
+
+		# reconstruct path
 		path = []
 		cur = goal
 
-		while cur in came_from:
-			path.append(cur)
-			cur = came_from[cur]
+		if cur not in came_from and cur != start:
+				return [], 0
+
+		while cur != start:
+				path.append(cur)
+				cur = came_from[cur]
 
 		path.reverse()
 		return path, len(path)
 
-	def astar_to(self, goal: Vector2, start: Optional[Vector2] = None):
-		origin = self.pos if start is None else start
-		return self.astar(origin, goal)
-
-	def path_distance_to(self, goal: Vector2, start: Optional[Vector2] = None) -> int:
-		_, length = self.astar_to(goal, start=start)
-		return length
-
 	def path_find_to(self, goal: Vector2, force: bool = False) -> list[Vector2]:
 		if self.status != STATUS.IDLE and not force:
-			return []
+				return []
 
-		goal = self.to_vector2(goal)
 		start = self.pos
-		absolute_path, _ = self.astar(start, goal)
-		dirs = []
-		prev = start
-
-		# convert into realtive steps ex.: Vector2(x=-1,y=1) => left up
-		for node in absolute_path:
-			dx = int(np.clip(node.x - prev.x, -1, 1)) # clamp it for safety
-			dy = int(np.clip(node.y - prev.y, -1, 1))
-			dirs.append(Vector2(dx, dy))
-			prev = node
+		dirs, _ = self.astar(start, goal)
 
 		self.path = dirs
 		self.status = STATUS.MOVE if dirs else STATUS.IDLE
@@ -222,21 +193,14 @@ class Rover:
 
 # ---------------- MINING ----------------
 
-	def can_mine(self) -> bool:
-		tile_mark = self.sim.map_obj.get_tile(self.pos)
-		return tile_mark in self.sim.map_obj.mineral_markers and self.status != STATUS.MINE
 
-	def mine(self, force: bool = False) -> bool:
-		if not force and not self.can_mine():
-			return False
-
-		tile_mark = self.sim.map_obj.get_tile(self.pos)
-		if tile_mark not in self.sim.map_obj.mineral_markers:
-			return False
+	def mine(self) -> bool:
+		tile = self.sim.map_obj.get_tile(self.pos)
+		if not tile or not tile not in self.sim.map_obj.mineral_markers: return False
 
 		self.mine_process_hrs = self.MINING_TIME_HRS
 		self.status = STATUS.MINE
-		self.storage[tile_mark] += 1
+		self.storage[tile] += 1
 		return True
 
 # ---------------- FRAME UPDATE ----------------
@@ -282,6 +246,14 @@ class Rover:
 		# out of energy -> stop
 		if self.battery <= 0:
 			self.status = STATUS.DEAD
+		
+		self.hrs_until_next_log -= delta_hrs
+		if self.hrs_until_next_log <= 0:
+			self.hrs_until_next_log = self.log_freq_per_hr
+			self.logger_obj.send_live(self.get_live_data())
+			self.logger_obj.send_setup(self.get_setup_data()) # TODO exlude constant setups
+
+# ----- ML helper -----
 
 	def get_control_snapshot(self, delta_hrs: float = 0.5) -> dict:
 		"""State/control snapshot intended for ML feature builders."""

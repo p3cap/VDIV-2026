@@ -14,7 +14,36 @@ class Simulation:
 		self.is_running = True
 		
 		self.elapsed_hrs = 0.0
-		self.is_day = True # TODO make func for calculating elapsed times daynight cycle
+		self.is_day = True
+
+# ---- ML helper ----
+
+	def get_context(self) -> dict:
+		"""Compact simulation snapshot for ML state builders."""
+		return {
+			"elapsed_hrs": float(self.elapsed_hrs),
+			"run_hrs": float(self.run_hrs),
+			"remaining_hrs": float(self.remaining_hrs()),
+			"time_in_cycle": float(self.get_time_in_cycle()),
+			"cycle_hrs": float(self.get_cycle_hrs()),
+			"is_day": bool(self.is_day),
+			"is_running": bool(self.is_running),
+			"sim_time_multiplier": float(self.sim_time_multiplier),
+			"day_hrs": float(self.day_hrs),
+			"night_hrs": float(self.night_hrs),
+		}
+
+# --- update ----
+
+	def update(self, delta_hrs:float):
+		if not self.is_running: print("Simulation stopped"); return
+		self.elapsed_hrs += delta_hrs
+		
+		self.is_day = self.is_day_at(self.elapsed_hrs)
+
+		self.is_running = self.elapsed_hrs < self.run_hrs
+
+# ----- functions -------
 
 	def reset(self):
 		self.elapsed_hrs = 0.0
@@ -33,29 +62,6 @@ class Simulation:
 
 	def remaining_hrs(self) -> float:
 		return max(0.0, self.run_hrs - self.elapsed_hrs)
-
-	def get_context(self) -> dict:
-		"""Compact simulation snapshot for ML state builders."""
-		return {
-			"elapsed_hrs": float(self.elapsed_hrs),
-			"run_hrs": float(self.run_hrs),
-			"remaining_hrs": float(self.remaining_hrs()),
-			"time_in_cycle": float(self.get_time_in_cycle()),
-			"cycle_hrs": float(self.get_cycle_hrs()),
-			"is_day": bool(self.is_day),
-			"is_running": bool(self.is_running),
-			"sim_time_multiplier": float(self.sim_time_multiplier),
-			"day_hrs": float(self.day_hrs),
-			"night_hrs": float(self.night_hrs),
-		}
-
-	def update(self, delta_hrs:float):
-		if not self.is_running: print("Simulation stopped"); return
-		self.elapsed_hrs += delta_hrs
-		
-		self.is_day = self.is_day_at(self.elapsed_hrs)
-
-		self.is_running = self.elapsed_hrs < self.run_hrs
 
 	def get_daytime_in_interval(self, start_hrs: float, end_hrs: float) -> float:
 		"""Calculate hours of daytime within [start_hrs, end_hrs) interval.
