@@ -1,7 +1,7 @@
 // full ai, majd atnezem
 
 
-import langDictionary from './langDictionary'
+import langDictionary from './langDictionary.js'
 
 const STORAGE_KEY = 'dashboard_language'
 const DEFAULT_LANGUAGE = 'HU'
@@ -72,6 +72,15 @@ export default t
 `igy hasznlajatok 
     import t, { setLanguage } from '@/data/translate'
 
-    setLanguage('EN')
-    console.log(t('test')) // "test"
+    <h1>{{ t('test', lang) }}</h1>
+    <button @click="switchLanguage">
+      Switch language ({{ lang }})
+    </button>
+
+    const lang = ref(getLanguage())
+
+    function switchLanguage() {
+      const next = lang.value === 'HU' ? 'EN' : 'HU'
+      lang.value = setLanguage(next)
+}
 `

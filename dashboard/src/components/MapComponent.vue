@@ -10,6 +10,9 @@ import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
 import testpng from '@/assets/textures/pttt_logo_mini.png'
+import t, { getLanguage, setLanguage } from '@/data/translate'
+
+
 
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
