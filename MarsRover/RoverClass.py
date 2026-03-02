@@ -189,7 +189,7 @@ class Rover:
 # ---------------- FRAME UPDATE ----------------
 
 	def update(self, delta_hrs:float):
-		if not self.sim.is_running: print("Rover stopped: Simulation not running"); return
+		if not self.sim.is_running: return #print("Rover stopped: Simulation not running");đ
 		if delta_hrs <= 0: return # don't calcaute for no reason
 
 		if self.status == STATUS.MOVE and self.path:
