@@ -1,5 +1,4 @@
 import argparse
-import math
 import os
 import sys
 import time
@@ -13,9 +12,8 @@ from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
-MARS_ROVER_ROOT = Path(__file__).resolve().parent.parent
-if str(MARS_ROVER_ROOT) not in sys.path:
-    sys.path.append(str(MARS_ROVER_ROOT))
+MARS_ROVER_ROOT = Path(__file__).parent.parent
+sys.path.append(str(MARS_ROVER_ROOT))
 
 from MapClass import Map, matrix_from_csv
 from RoverClass import GEARS, STATUS, Rover
@@ -23,13 +21,13 @@ from Simulation import Simulation
 from Global import Vector2
 
 
-def ts_print(message: str):
+def ts_print(message: str): # time stapmed print
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now}] {message}")
 
 
 class RoverSimpleEnv(gym.Env):
-    """Gymnasium env for ppo"""
+    """Gymnasium env for rover trainer"""
 
     metadata = {"render_modes": []}
 
@@ -48,6 +46,8 @@ class RoverSimpleEnv(gym.Env):
 
         self.map_path = MARS_ROVER_ROOT / "data" / "mars_map_50x50.csv"
         self.max_dist = 0.0
+        self._rank_cache_key = None
+        self._rank_cache = []
         self._build_world()
 
     # setup simulation 
@@ -61,7 +61,40 @@ class RoverSimpleEnv(gym.Env):
             sim_time_multiplier=1.0,
         )
         self.rover = Rover(id="ppo_rover", sim=self.sim)
-        self.max_dist = max(1.0, math.hypot(map_obj.width - 1, map_obj.height - 1))
+        # Upper bound for normalized A* distance on grid.
+        self.max_dist = max(1.0, float(map_obj.width * map_obj.height))
+        self._rank_cache_key = None
+        self._rank_cache = []
+
+    def _get_ranked_minerals(self):
+        minerals = self.sim.map_obj.get_poses_of_tiles(self.sim.map_obj.mineral_markers)
+        mineral_key = tuple(sorted((m.x, m.y) for m in minerals))
+        state_key = (self.rover.pos.x, self.rover.pos.y, mineral_key)
+
+        if self._rank_cache_key == state_key:
+            return self._rank_cache
+
+        ranked = []
+        for mineral in minerals:
+            print("astar")
+            abs_path, dist = self.rover.astar(self.rover.pos, mineral)
+            rel_steps = []
+            # Stable fallback for unreachable/invalid results.
+            if mineral != self.rover.pos and (not np.isfinite(dist) or dist <= 0):
+                dist = float("inf")
+
+            if np.isfinite(dist) and len(abs_path) > 0:
+                prev = self.rover.pos
+                for node in abs_path:
+                    rel_steps.append(Vector2(node.x - prev.x, node.y - prev.y))
+                    prev = node
+
+            ranked.append((mineral, float(dist), rel_steps))
+
+        ranked.sort(key=lambda item: (item[1], item[0].x, item[0].y))
+        self._rank_cache_key = state_key
+        self._rank_cache = ranked
+        return ranked
 
     def _obs(self): # inputs to the neural network
         m = self.sim.map_obj
@@ -84,11 +117,10 @@ class RoverSimpleEnv(gym.Env):
         )
 
         # mineral distances and positions
-        mineral_poses = self.sim.map_obj.get_poses_of_tiles(self.sim.map_obj.mineral_markers)
-        mineral_input = sorted(
-            [(self.rover.astar(self.rover.pos, pos)[1], pos.x, pos.y) for pos in mineral_poses],
-            key=lambda x: x[0]
-        )[:self.mineral_count]
+        ranked = self._get_ranked_minerals()[:self.mineral_count]
+        mineral_input = [
+            (dist, pos.x, pos.y) for pos, dist, _ in ranked
+        ]
         
         # Pad with zeros if fewer minerals than expected
         while len(mineral_input) < self.mineral_count:
@@ -97,7 +129,10 @@ class RoverSimpleEnv(gym.Env):
         # Normalize mineral data: [distance, x, y]
         mineral_data = []
         for dist, x, y in mineral_input:
-            mineral_data.append(min(1.0, dist / self.max_dist))  # normalize distance
+            if not np.isfinite(dist):
+                mineral_data.append(1.0)
+            else:
+                mineral_data.append(min(1.0, dist / self.max_dist))  # normalize distance
             mineral_data.append(x / max(1, m.width - 1))  # normalize x
             mineral_data.append(y / max(1, m.height - 1))  # normalize y
 
@@ -114,7 +149,7 @@ class RoverSimpleEnv(gym.Env):
         prev_battery = self.rover.battery
         prev_distance = self.rover.distance_travelled
         prev_mined_amount = sum(self.rover.storage.values())
-        minerals = self.sim.map_obj.get_poses_of_tiles(self.sim.map_obj.mineral_markers)
+        ranked = self._get_ranked_minerals()
 
         if action == 0:
             self.rover.gear = GEARS.SLOW
@@ -125,16 +160,14 @@ class RoverSimpleEnv(gym.Env):
         elif 3 <= action < 3 + self.mineral_count and self.rover.status == STATUS.IDLE:
             # Actions 3 to 3+mineral_count-1: go to mineral at index (action - 3)
             mineral_idx = action - 3
-            mineral_distances = [
-                (m, math.hypot(m.x - self.rover.pos.x, m.y - self.rover.pos.y))
-                for m in minerals
-            ]
-            mineral_distances.sort(key=lambda x: x[1])
-            if mineral_idx < len(mineral_distances):
-                target_mineral, _ = mineral_distances[mineral_idx]
-                self.rover.path_find_to(target_mineral)
-                # Update prev_mined to track last targeted mineral position
-                self.prev_mined = target_mineral
+            if mineral_idx < len(ranked):
+                target_mineral, dist, rel_steps = ranked[mineral_idx]
+                if np.isfinite(dist) and len(rel_steps) > 0:
+                    self.rover.move_progress = 0.0
+                    self.rover.path = rel_steps
+                    self.rover.status = STATUS.MOVE
+                    # Track last successfully planned target.
+                    self.prev_mined = target_mineral
         elif action == 3 + self.mineral_count and self.rover.status == STATUS.IDLE:
             # Last action: mine
             self.rover.mine()
@@ -148,6 +181,7 @@ class RoverSimpleEnv(gym.Env):
         dist_gain = self.rover.distance_travelled - prev_distance
         minerals_left = len(self.sim.map_obj.get_poses_of_tiles(self.sim.map_obj.mineral_markers))
 
+        # REWARD
         reward = 0.0
         reward += mined_now * 20.0
         reward += dist_gain * 0.1
@@ -165,14 +199,8 @@ class RoverSimpleEnv(gym.Env):
         return self._obs(), float(reward), terminated, truncated, {}
 
 
-def train_model(
-    timesteps: int,
-    out_path: str,
-    device: str = "auto",
-    n_envs: int = 1,
-    torch_threads: int | None = None,
-    cpu_limit: float = 0.9,
-):
+def train_model(timesteps: int, out_path: str, device: str = "auto", n_envs: int = 1, torch_threads: int | None = None, cpu_limit: float = 0.9):
+
     start_time = time.perf_counter()
     cpu_limit = max(0.01, min(1.0, cpu_limit))
     cpu_budget = max(1, int(round((os.cpu_count() or 1) * cpu_limit)))
@@ -215,6 +243,8 @@ def train_model(
 
 
 def main():
+
+    # computer rescources limit
     parser = argparse.ArgumentParser(description="Simple PPO training for rover env.")
     parser.add_argument("--timesteps", type=int, default=100_000)
     parser.add_argument(
@@ -224,10 +254,10 @@ def main():
         choices=["auto", "cpu", "cuda"],
         help="Torch device: auto (default), cpu, or cuda.",
     )
-    parser.add_argument(
+    parser.add_argument( 
         "--cpu-limit",
         type=float,
-        default=1.0,
+        default=0.9,
         help="CPU cap from 0.01 to 1.0 (1.0 = 100%%, 0.5 = 50%%).",
     )
     parser.add_argument(
@@ -242,11 +272,13 @@ def main():
         default=0,
         help="Torch CPU threads (0 = auto from --cpu-limit).",
     )
-    parser.add_argument(
+    parser.add_argument( # Trainder model path
         "--out",
         type=str,
         default=str(MARS_ROVER_ROOT / "MachineLearning" / "trained" / "rover_ppo_simple"),
     )
+
+    # start training process
     args = parser.parse_args()
     train_model(
         timesteps=args.timesteps,

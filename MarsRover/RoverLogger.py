@@ -2,24 +2,14 @@ import json
 from urllib.parse import urlparse
 
 import requests
+from websockets.sync.client import connect
 
-try:
-    from websockets.sync.client import connect
-except Exception:
-    connect = None
 
 
 class RoverLogger:
-    def __init__(
-        self,
-        base_url: str,
-        ws_path: str = "/ws",
-        timeout: float = 3.0,
-        use_websocket: bool = True,
-    ):
+    def __init__(self, base_url: str, ws_path: str = "/ws", timeout: float = 3.0):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self.use_websocket = use_websocket
         self.ws_url = self._to_ws_url(self.base_url, ws_path)
         self.ws = None
 
@@ -31,8 +21,6 @@ class RoverLogger:
         return f"{scheme}://{host}{path}"
 
     def _connect_ws(self) -> bool:
-        if not self.use_websocket or connect is None:
-            return False
         if self.ws is not None:
             return True
         try:
