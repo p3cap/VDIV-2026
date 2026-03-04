@@ -47,7 +47,7 @@ class Rover:
 		self.battery = 100.0
 		self.status = STATUS.IDLE
 
-		self.pos = self.sim.map_obj.get_poses_of_tile(self.sim.map_obj.rover_marker, limit=1) # get pos on map
+		self.pos = self.sim.map_obj.get_poses_of_tiles([self.sim.map_obj.rover_marker], limit=1) # get pos on map
 		self.start_pos = self.pos
 		
 		self.path:Path = [] # the desired path the robot is going to follow
@@ -120,7 +120,7 @@ class Rover:
 		if isinstance(start, (tuple, list)):
 			start = Vector2(start[0], start[1])
 		if isinstance(goal, (tuple, list)):
-			goal = Vector2(goal[0], goal[1]) # TODO REVISE!!!!!!!!!!!!!!!! a cucc nem mindig találja meg a legjobbat
+			goal = Vector2(goal[0], goal[1])
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
@@ -153,7 +153,6 @@ class Rover:
 		path.reverse()
 		return path, len(path)
 
-	
 	def path_find_to(self, goal: Vector2) -> list[Vector2]:
 		if self.status != STATUS.IDLE: return
 		if isinstance(goal, (tuple, list)):
@@ -264,7 +263,7 @@ class Rover:
 			"rover_mode": "machine_learning", # Will be the type of algory
 		}
 
-	# ---------- Self print Formatter --------------
+# ---------- Self print Formatter --------------
 	def __repr__(self):
 		line = "=" * 40
 		
