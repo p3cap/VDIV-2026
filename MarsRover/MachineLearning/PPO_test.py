@@ -16,33 +16,35 @@ if str(MARS_ROVER_ROOT) not in sys.path:
 from MapClass import Map, matrix_from_csv
 from RoverClass import GEARS, STATUS, Rover
 from Simulation import Simulation
+from Global import Vector2
 
 
 class RoverSimpleEnv(gym.Env):
-    """Simple Gymnasium environment for training PPO on the rover simulation."""
+    """Gymnasium env for ppo"""
 
     metadata = {"render_modes": []}
 
-    def __init__(self, run_hrs: float = 24.0, delta_hrs: float = 0.5, num_minerals: int = 30):
+    def __init__(self, run_hrs: float = 24.0, delta_hrs: float = 0.5, mineral_count: int = 30):
         super().__init__()
         self.run_hrs = run_hrs
         self.delta_hrs = delta_hrs
-        self.num_minerals = num_minerals
+        self.mineral_count = mineral_count
 
         # Actions: 0-2 set gear, 3-(3+num_minerals-1) goto mineral, last action mine
-        self.action_space = spaces.Discrete(3 + num_minerals + 1)
+        self.action_space = spaces.Discrete(3 + mineral_count + 1)
         # [x, y, battery, run_hrs, gear, time_of_day] + [min_x, min_y, min_dist] * num_minerals
-        obs_size = 6 + (num_minerals * 3)
+        obs_size = 6 + (mineral_count * 3)
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32)
 
         self.map_path = MARS_ROVER_ROOT / "data" / "mars_map_50x50.csv"
-        self.max_dist = 1.0
+        self.max_dist = 0.0
         self._build_world()
 
+    # setup simulation 
     def _build_world(self):
         map_obj = Map(matrix_from_csv(str(self.map_path)))
         self.sim = Simulation(
-            map_obj=map_obj,
+            map_obj=map_obj, 
             run_hrs=self.run_hrs,
             day_hrs=16.0,
             night_hrs=8.0,
@@ -50,78 +52,45 @@ class RoverSimpleEnv(gym.Env):
         )
         self.rover = Rover(id="ppo_rover", sim=self.sim)
         self.max_dist = max(1.0, math.hypot(map_obj.width - 1, map_obj.height - 1))
-        self.prev_mined = 0
+        self.prev_mined = Vector2(0,0)
 
-    def _all_minerals(self):
-        minerals = []
-        for marker in self.sim.map_obj.mineral_markers:
-            minerals.extend(self.sim.map_obj.get_poses_of_tile(marker))
-        return minerals
-
-    def _nearest_mineral(self):
-        minerals = self._all_minerals()
-        if not minerals:
-            return None, 0.0
-        nearest = min(
-            minerals,
-            key=lambda p: math.hypot(p.x - self.rover.pos.x, p.y - self.rover.pos.y),
-        )
-        dist = math.hypot(nearest.x - self.rover.pos.x, nearest.y - self.rover.pos.y)
-        return nearest, dist
-
-    def _obs(self):
+    def _obs(self): # inputs to the nerual network
         m = self.sim.map_obj
         cycle = self.sim.day_hrs + self.sim.night_hrs
 
-        if self.rover.gear == GEARS.SLOW:
-            gear_norm = 0.0
-        elif self.rover.gear == GEARS.NORMAL:
-            gear_norm = 0.5
-        else:
-            gear_norm = 1.0
+        gear_norm = list(GEARS).index(self.rover.gear) / (len(GEARS) - 1)
 
-        # Base state: [x, y, battery, run_hrs, gear, time_of_day]
+        #  [x, y, battery, run_hrs, gear, time_of_day, prev_x, prev_y]
         obs = np.array(
             [
                 self.rover.pos.x / max(1, m.width - 1),
                 self.rover.pos.y / max(1, m.height - 1),
                 self.rover.battery / self.rover.MAX_BATTERY_CHARGE,
-                self.sim.elapsed_hrs / self.run_hrs,
-                gear_norm,
+                min(1, self.run_hrs/240), # 10+ days -> lot of time to discover
+                list(GEARS).index(self.rover.gear) / (len(GEARS) - 1),
                 (self.sim.elapsed_hrs % cycle) / cycle,
+                self.prev_mined.x / max(1, m.height - 1),
+                self.prev_mined.y / max(1, m.height - 1)
             ],
             dtype=np.float32,
         )
 
-        # Get all minerals and sort by distance
-        minerals = self._all_minerals()
-        mineral_distances = [
-            (m, math.hypot(m.x - self.rover.pos.x, m.y - self.rover.pos.y))
-            for m in minerals
-        ]
-        mineral_distances.sort(key=lambda x: x[1])
+        # mineral disatnces
+        mineral_poses = self.sim.map_obj.get_poses_of_tiles(self.sim.map_obj.mineral_markers)
+        mineral_input = sorted(
+            [(self.rover.astar(self.rover.pos, pos), pos.x, pos.y) for pos in mineral_poses],
+            key=lambda x: x[0]
+        )
 
-        # Add closest num_minerals minerals (padded with zeros if fewer available)
-        mineral_obs = []
-        for i in range(self.num_minerals):
-            if i < len(mineral_distances):
-                mineral_pos, dist = mineral_distances[i]
-                mineral_obs.extend([
-                    mineral_pos.x / max(1, m.width - 1),
-                    mineral_pos.y / max(1, m.height - 1),
-                    dist / self.max_dist,
-                ])
-            else:
-                # Pad with zeros if not enough minerals
-                mineral_obs.extend([0.0, 0.0, 0.0])
+        return np.concatenate([obs, np.array(mineral_input, dtype=np.float32)])
 
-        return np.concatenate([obs, np.array(mineral_obs, dtype=np.float32)])
-
+    # reset....
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         self._build_world()
         return self._obs(), {}
 
+    #one step in the simulation
     def step(self, action):
         prev_battery = self.rover.battery
         prev_distance = self.rover.distance_travelled

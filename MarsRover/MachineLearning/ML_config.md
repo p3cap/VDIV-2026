@@ -9,24 +9,26 @@ and can order the rover to move to the given ore.
 *Find out how to send lists thru nodes, optimised*
 *nodes can only have value 0-1*
 
-- pos x
-- pos y
 - battery
 - gear (0,0.5,1)
-- run_hrs
+- run_hrs 
 - time of day
+- rover x
+- rover y
+- previoulsy mined x
+- previoulsy mined y
 
-- closest mineral 1 - pos x
-- closest mineral 1 - pos y
+
 - closest mineral 1 - distance
-
-- closest mineral 2 - pos x
-- closest mineral 2 - pos y
+- closest mineral 1 - x
+- closest mineral 1 - y
 - closest mineral 2 - distance
-
-- closest mineral 3 - pos x
-- closest mineral 3 - pos y
+- closest mineral 2 - x
+- closest mineral 2 - y
 - closest mineral 3 - distance
+- closest mineral 3 - x
+- closest mineral 3 - y
+- ...
 
 ... futtatok rá tesztet mennyi a legoptimálisabb mennyiség (szerintem olyan 30 körül)
 
