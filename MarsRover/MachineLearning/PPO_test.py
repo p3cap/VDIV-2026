@@ -263,7 +263,7 @@ def main():
     parser.add_argument(
         "--n-envs",
         type=int,
-        default=0,
+        default=1,
         help="Parallel environments (0 = auto from --cpu-limit).",
     )
     parser.add_argument(
