@@ -9,7 +9,7 @@ url = "http://127.0.0.1:8000" # TODO make universal
 
 
 map_obj = Map(
-	map_data = matrix_from_csv(MARS_ROVER_PATH+r"/data/mars_map_50x50.csv") # TODO make universal
+	map_data = matrix_from_csv(str(MARS_ROVER_PATH)+r"/data/mars_map_50x50.csv") # TODO make universal
 )
 
 sim = Simulation(
@@ -26,8 +26,6 @@ rover = Rover(
 )
 logger = RoverLogger(url)
 logger.send_setup(rover.get_setup_data())
-
-
 
 
 # -- test run --
@@ -62,7 +60,7 @@ while True:
 	logger.send_live(rover.get_live_data(delta_hrs))
 	# TEST ONLY json server packet
 
-	rover.send_log(url)
+	#rover.send_log(url)
 	#print("Server response:", response.json())
 
 	time.sleep(1) # TODO 1/sim.sim_time_multiplie
