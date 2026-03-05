@@ -6,6 +6,39 @@ from collections import deque
 import requests
 import time
 
+import os
+import sys
+
+# MSYS2 DLL-ek betöltése (ez elengedhetetlen Windows-on a betöltéshez)
+msys_path = r"C:\msys64\ucrt64\bin"
+if os.path.exists(msys_path):
+    os.add_dll_directory(msys_path)
+
+try:
+    import cpp_path
+    print("Siker! A cpp_path modul beimportálva.")
+except ImportError as e:
+    print(f"Import hiba: {e}")
+    # Ha itt elszáll, ellenőrizd, hogy a cpp_path.pyd a brain.py mellett van-e!
+
+# Példa hívás, hogy ellenőrizzük a létezését
+if 'cpp_path' in locals() or 'cpp_path' in globals():
+    print("A 'cpp_path' objektum elérhető.")
+else:
+    print("A 'cpp_path' továbbra sem definiált.")
+# Teszt adatok
+csv_helye = "map.csv" # Legyen ilyen fájlod!
+start = (0, 0)
+cel = (5, 5)
+
+try:
+    utvonal = cpp_path.astar_from_csv(csv_helye, start, cel)
+    print("Talált útvonal:", utvonal)
+except Exception as e:
+    print("Hiba történt:", e)
+
+
+
 #szerver start
 #cd dashboard 
 #npm run dev
@@ -104,6 +137,4 @@ while(rover.battery != 0):
         if rover.status != STATUS.MINE:
             tavolsag_lista.pop(0)
 
-    serverpost()
-    
-
+    serverpost()   

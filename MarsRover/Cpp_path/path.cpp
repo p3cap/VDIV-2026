@@ -1,6 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-
+// include flag ,tasks.js
 #include <vector>
 #include <string>
 #include <fstream>
@@ -166,7 +166,6 @@ static std::vector<Vector2> astar(const Map& map, const Vector2& start, const Ve
 // Python-barát wrapper
 // -------------------
 
-namespace py = pybind11;
 
 // Python (x,y) -> Vector2
 static Vector2 to_vec2(const py::object& obj) {
