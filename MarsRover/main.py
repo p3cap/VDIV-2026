@@ -69,7 +69,7 @@ def main():
     )
 
     rover = Rover(id="test_rover", sim=sim)
-    logger = RoverLogger(args.base_url, use_websocket=not args.http_only)
+    logger = RoverLogger(args.base_url)
 
     gear_map = {
         "slow": GEARS.SLOW,

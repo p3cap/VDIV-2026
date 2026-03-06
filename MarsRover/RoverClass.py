@@ -153,6 +153,62 @@ class Rover:
 		path.reverse()
 		return path, len(path)
 
+	def astar_to_any(self, start: Vector2, goals):
+		if isinstance(start, (tuple, list)):
+			start = Vector2(start[0], start[1])
+
+		goal_list = []
+		for goal in goals:
+			if isinstance(goal, (tuple, list)):
+				goal_list.append(Vector2(goal[0], goal[1]))
+			else:
+				goal_list.append(goal)
+
+		if not goal_list:
+			return None, [], float("inf")
+
+		goal_set = set(goal_list)
+		if start in goal_set:
+			return start, [], 0
+
+		def heuristic_to_goals(node: Vector2) -> int:
+			return min(self.heuristic(node, goal) for goal in goal_list)
+
+		open_set = []
+		heapq.heappush(open_set, (0, start))
+
+		came_from = {}
+		g_score = {start: 0}
+		found_goal = None
+
+		while open_set:
+			_, current = heapq.heappop(open_set)
+
+			if current in goal_set:
+				found_goal = current
+				break
+
+			for neighbor in self.get_neighbors(current):
+				tentative = g_score[current] + 16
+
+				if neighbor not in g_score or tentative < g_score[neighbor]:
+					came_from[neighbor] = current
+					g_score[neighbor] = tentative
+					f = tentative + heuristic_to_goals(neighbor)
+					heapq.heappush(open_set, (f, neighbor))
+
+		if found_goal is None:
+			return None, [], float("inf")
+
+		path = []
+		cur = found_goal
+		while cur in came_from:
+			path.append(cur)
+			cur = came_from[cur]
+
+		path.reverse()
+		return found_goal, path, len(path)
+
 	def path_find_to(self, goal: Vector2) -> list[Vector2]:
 		if self.status != STATUS.IDLE: return
 		if isinstance(goal, (tuple, list)):
