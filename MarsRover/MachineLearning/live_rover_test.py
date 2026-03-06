@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import requests
 
 # Resolve imports when launched from project root or MachineLearning folder.
 ML_DIR = Path(__file__).resolve().parent
@@ -99,7 +100,13 @@ class RoverDQNController:
 
 
 def post_json(url: str, endpoint: str, payload: dict):
-    rover.send_log(url)
+    try:
+        response = requests.post(f"{url}{endpoint}", json=payload, timeout=3)
+        response.raise_for_status()
+        return response
+    except requests.exceptions.RequestException as exc:
+        print(f"POST failed {endpoint}: {exc}")
+        return None
 
 
 def advance_world(sim: Simulation, rover: Rover, delta_hrs: float):
@@ -194,6 +201,7 @@ if __name__ == "__main__":
             "mine_process_hrs": rover.mine_process_hrs,
             "path_plan": [v._dict() for v in rover.path],
         }
+        post_json(url, "/send_setup", setup_data)
         post_json(url, "/send_data", live_data)
 
         if rover.status == STATUS.DEAD:

@@ -56,7 +56,8 @@ while True:
 	#print(rover)
 	# print(sim)
 
-	#send live data 
+	# send setup + live data every tick
+	logger.send_setup(rover.get_setup_data())
 	logger.send_live(rover.get_live_data(delta_hrs))
 	# TEST ONLY json server packet
 

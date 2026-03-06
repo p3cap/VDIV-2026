@@ -7,7 +7,8 @@ class RoverLogger:
 
     def send_setup(self, data: dict):
         try:
-            response = requests.post(f"{self.base_url}/send_setup", json=data)
+            response = requests.post(f"{self.base_url}/send_setup", json=data, timeout=3)
+            response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
             print(f"Error sending setup data: {e}")
@@ -15,7 +16,8 @@ class RoverLogger:
 
     def send_live(self, data: dict):
         try:
-            response = requests.post(f"{self.base_url}/send_data", json=data)
+            response = requests.post(f"{self.base_url}/send_data", json=data, timeout=3)
+            response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
             print(f"Error sending live data: {e}")
