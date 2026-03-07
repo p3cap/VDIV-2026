@@ -23,14 +23,15 @@ class Map:
 				"G": "Green"
 		}
 
-	def get_poses_of_tile(self, tile_name:str, limit:int=-1):
+	def get_poses_of_tiles(self, tile_names:list[str], limit:int=-1):
 		found = []
-		for y in range(self.height):
-			for x in range(self.width):
-				if self.map_data[y][x] == tile_name:
-					found.append(Vector2(x,y))
-					if limit > 0 and len(found) >= limit:
-						return found[0] if limit == 1 else found
+		for tile in tile_names:
+			for y in range(self.height):
+				for x in range(self.width):
+					if self.map_data[y][x] == tile:
+						found.append(Vector2(x,y))
+						if limit > 0 and len(found) >= limit:
+							return found[0] if limit == 1 else found
 		return found
 
 	def get_tile(self, position:Vector2):
