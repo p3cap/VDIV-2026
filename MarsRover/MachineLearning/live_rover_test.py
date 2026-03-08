@@ -1,10 +1,8 @@
-import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import requests
 from stable_baselines3 import PPO
 
 MARS_ROVER_ROOT = Path(__file__).parent.parent
@@ -24,17 +22,7 @@ def ts_print(message: str):
 class LivePolicyEnv:
     """Minimal policy inference wrapper over RoverSimulationWorld."""
 
-    def __init__(
-        self,
-        run_hrs: float,
-        mineral_count: int,
-        delta_mode: str,
-        set_delta_hrs: float,
-        tick_seconds: float,
-        env_speed: float,
-        base_url: str,
-        send_every: int,
-    ):
+    def __init__(self, run_hrs: float, mineral_count: int, delta_mode: str, set_delta_hrs: float, tick_seconds: float, env_speed: float, base_url: str, send_every: int):
         self.mineral_count = mineral_count
         self.prev_mined = None
         self.world = RoverSimulationWorld(
@@ -47,9 +35,9 @@ class LivePolicyEnv:
             base_url=base_url,
             send_every=send_every,
         )
-        self.obs_size = 9 + (self.mineral_count * 3)
+        self.obs_size = 9 + (self.mineral_count * 3) # input size
 
-    def _ranked_minerals(self):
+    def _ranked_minerals(self): # get mineral distances
         rover = self.world.rover
         ranked = []
         for mineral in self.world.minerals():
@@ -60,7 +48,7 @@ class LivePolicyEnv:
         ranked.sort(key=lambda item: (item[1], item[0].x, item[0].y))
         return ranked[: self.mineral_count]
 
-    def obs(self):
+    def obs(self): # NN Inputs
         rover = self.world.rover
         sim = self.world.sim
         obs = np.zeros(self.obs_size, dtype=np.float32)
@@ -117,20 +105,6 @@ class LivePolicyEnv:
         return done, delta_hrs, real_dt_seconds
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Run trained PPO model as live rover logger.")
-    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000")
-    parser.add_argument("--steps", type=int, default=0)
-    parser.add_argument("--delta-mode", type=str, choices=["set_time", "real_time"], default="set_time")
-    parser.add_argument("--delta-hrs", type=float, default=0.5, help="Used in set_time mode.")
-    parser.add_argument("--tick-seconds", type=float, default=1.0, help="Loop interval in seconds.")
-    parser.add_argument("--env-speed", type=float, default=1.0, help="Used in real_time mode.")
-    parser.add_argument("--send-every", type=int, default=1)
-    parser.add_argument("--run-hrs", type=float, default=24.0)
-    parser.add_argument("--deterministic", action="store_true")
-    return parser.parse_args()
-
-
 def choose_model_base() -> str:
     trained_dir = ML_ROOT / "trained"
     models = sorted(trained_dir.glob("*.zip"))
@@ -145,21 +119,30 @@ def choose_model_base() -> str:
 
 
 def main():
-    args = parse_args()
+    base_url = "http://127.0.0.1:8000"
+    steps = 0
+    delta_mode = "set_time"
+    delta_hrs = 0.5
+    tick_seconds = 1.0
+    env_speed = 1.0
+    send_every = 1
+    run_hrs = 240.0
+    deterministic ="store_true"
+
     model_base = choose_model_base()
     model = PPO.load(model_base)
 
     obs_size = int(model.observation_space.shape[0])
     mineral_count = max(1, (obs_size - 9) // 3)
     env = LivePolicyEnv(
-        run_hrs=args.run_hrs,
+        run_hrs=run_hrs,
         mineral_count=mineral_count,
-        delta_mode=args.delta_mode,
-        set_delta_hrs=args.delta_hrs,
-        tick_seconds=args.tick_seconds,
-        env_speed=args.env_speed,
-        base_url=args.base_url,
-        send_every=args.send_every,
+        delta_mode=delta_mode,
+        set_delta_hrs=delta_hrs,
+        tick_seconds=tick_seconds,
+        env_speed=env_speed,
+        base_url=base_url,
+        send_every=send_every,
     )
     obs = env.obs()
     step = 0
@@ -168,10 +151,9 @@ def main():
         while True:
             step += 1
 
-            action, _ = model.predict(obs, deterministic=args.deterministic)
+            action, _ = model.predict(obs, deterministic=deterministic)
             done, delta_hrs, real_dt = env.step(int(action))
             obs = env.obs()
-
             sent_ok = env.world.last_send_ok
 
             ts_print(
@@ -180,7 +162,7 @@ def main():
                 f"action={int(action)} sent={'ok' if sent_ok else 'failed'}"
             )
 
-            if done or (args.steps > 0 and step >= args.steps):
+            if done or (steps > 0 and step >= steps):
                 break
     finally:
         env.world.close()

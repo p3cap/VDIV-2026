@@ -47,6 +47,7 @@ class RoverLogger:
         self.ws = None
 
     def _send_ws(self, event_type: str, payload: dict) -> bool:
+        print(payload)
         if not self._connect_ws():
             return False
 

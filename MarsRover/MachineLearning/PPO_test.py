@@ -1,4 +1,8 @@
-import argparse, os, time, sys
+"""
+PPO based ML traning for a mars rover envirement
+More info: doc/PPO_machine_learning_doc.md
+"""
+import os, time, sys
 from pathlib import Path
 
 import gymnasium as gym
@@ -16,10 +20,8 @@ from Global import Vector2
 from RoverClass import GEARS, STATUS
 from Simulation_env import RoverSimulationWorld
 
-GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}
+GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0} # for rl input/output
 
-def log(message: str):
-    print(message, flush=True)
 
 class MinuteProgressCallback(BaseCallback):
     def __init__(self, total_timesteps: int, log_every_seconds: int = 60):
@@ -35,14 +37,14 @@ class MinuteProgressCallback(BaseCallback):
         self._start_wall = now
         self._last_log_wall = now
         self._start_steps = int(self.model.num_timesteps)
-        log(f"Progress: 0/{self.total_timesteps} (0.0%)")
+        print(f"Progress: 0/{self.total_timesteps} (0.0%)")
 
     def _print_progress(self):
         elapsed = max(1e-9, time.perf_counter() - self._start_wall)
         run_steps = max(0, int(self.num_timesteps) - self._start_steps)
         pct = min(100.0, (run_steps / self.total_timesteps) * 100.0)
         fps = run_steps / elapsed
-        log(f"Progress: {run_steps}/{self.total_timesteps} ({pct:.1f}%), elapsed={elapsed:.1f}s, fps={fps:.1f}")
+        print(f"Progress: {run_steps}/{self.total_timesteps} ({pct:.1f}%), elapsed={elapsed:.1f}s, fps={fps:.1f}")
 
     def _on_step(self) -> bool:
         now = time.perf_counter()
@@ -145,14 +147,7 @@ class RoverSimpleEnv(gym.Env):
         self._rank_cache = []
         return self._obs(), {}
 
-    def _compute_reward(
-        self,
-        mined_now: float,
-        dist_gain: float,
-        battery_cost: float,
-        minerals_left: int,
-        is_dead: bool,
-    ) -> float:
+    def _compute_reward(self, mined_now: float, dist_gain: float, battery_cost: float, minerals_left: int, is_dead: bool) -> float:
         reward = mined_now * 20.0 + (dist_gain * 0.1) - (battery_cost * 0.02) - 0.05
         if dist_gain <= 0 and mined_now <= 0:
             self.no_move_streak += 1
@@ -164,7 +159,7 @@ class RoverSimpleEnv(gym.Env):
             self.no_move_streak = 0
 
         if is_dead:
-            reward -= 20.0
+            reward -= 200.0
         if minerals_left == 0:
             reward += 50.0
         return reward
@@ -207,9 +202,8 @@ class RoverSimpleEnv(gym.Env):
         return self._obs(), float(reward), terminated, False, {}
 
 
-def resolve_device(device: str) -> str:
+def resolve_device(device: str) -> str: # device optimisation when training
     return "cuda" if device == "auto" and torch.cuda.is_available() else ("cpu" if device == "auto" else device)
-
 
 def compute_parallelism(device: str, cpu_limit: float, n_envs: int, torch_threads: int):
     cpu_limit = min(1.0, max(0.01, float(cpu_limit)))
@@ -232,14 +226,7 @@ def build_vec_env(n_envs: int):
     return SubprocVecEnv([make_env for _ in range(n_envs)]) if n_envs > 1 else DummyVecEnv([make_env])
 
 
-def train_model(
-    timesteps: int,
-    out_path: str,
-    device: str = "auto",
-    cpu_limit: float = 1.0,
-    n_envs: int = 0,
-    torch_threads: int = 0,
-):
+def train_model(timesteps: int, out_path: str, device: str = "auto", cpu_limit: float = 1.0, n_envs: int = 0, torch_threads: int = 0):
     start_time = time.perf_counter()
     resolved_device = resolve_device(device)
     cpu_budget, n_envs, torch_threads = compute_parallelism(resolved_device, cpu_limit, n_envs, torch_threads)
@@ -250,7 +237,7 @@ def train_model(
     except RuntimeError:
         pass
 
-    log(
+    print(
         "Training setup:"
         f" device={resolved_device}, timesteps={timesteps}, cpu_budget={cpu_budget},"
         f" n_envs={n_envs}, torch_threads={torch_threads}"
@@ -261,11 +248,11 @@ def train_model(
     model_zip = model_base.with_suffix(".zip")
 
     if model_zip.exists() and model_zip.stat().st_size > 0:
-        log(f"Resuming model: {model_zip}")
+        print(f"Resuming model: {model_zip}")
         model = PPO.load(str(model_zip), env=vec_env, device=resolved_device)
         reset_num_timesteps = False
     else:
-        log("Starting new PPO model")
+        print("Starting new PPO model")
         model = PPO("MlpPolicy", vec_env, verbose=0, device=resolved_device)
         reset_num_timesteps = True
 
@@ -281,39 +268,35 @@ def train_model(
 
     vec_env.close()
     elapsed = time.perf_counter() - start_time
-    log(f"Training finished in {elapsed:.1f}s")
-    log(f"Saved model: {model_base}.zip")
+    print(f"Training finished in {elapsed:.1f}s")
+    print(f"Saved model: {model_base}.zip")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PPO trainer for rover environment.")
-    parser.add_argument("--timesteps", type=int, default=100000)
-    parser.add_argument("--cpu-limit", type=float, default=1.0)
-    parser.add_argument("--n-envs", type=int, default=0, help="0 = auto")
-    parser.add_argument("--torch-threads", type=int, default=0, help="0 = auto")
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
-    args = parser.parse_args()
+    timesteps = 100000
+    cpu_limit = 1.0
+    n_envs = 0
+    torch_threads = 0
+    device ="auto"
 
     trained_dir = MARS_ROVER_ROOT / "MachineLearning" / "trained"
-    trained_dir.mkdir(parents=True, exist_ok=True)
 
-    models = sorted(trained_dir.glob("*.zip"))
+    models = sorted(trained_dir.glob("*.zip")) # list avaliable models
     print("\nAvailable models:")
     for idx, model_file in enumerate(models, start=1):
         print(f"  {idx}. {model_file.stem}")
     print()
 
     model_name = input("Model name [rover_ppo_simple]: ").strip() or "rover_ppo_simple"
-    timesteps = int(input(f"Timesteps [{args.timesteps}]: ").strip() or str(args.timesteps))
     out_path = str(trained_dir / model_name)
 
     train_model(
         timesteps=timesteps,
         out_path=out_path,
-        device=args.device,
-        cpu_limit=args.cpu_limit,
-        n_envs=args.n_envs,
-        torch_threads=args.torch_threads,
+        device=device,
+        cpu_limit=cpu_limit,
+        n_envs=n_envs,
+        torch_threads=torch_threads,
     )
 
 

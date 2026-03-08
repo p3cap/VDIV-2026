@@ -1,86 +1,26 @@
-// full ai, majd atnezem
+// dictionary
+import translationDictonary from './langDictionary.js'
 
-
-import langDictionary from './langDictionary.js'
-
-const STORAGE_KEY = 'dashboard_language'
-const DEFAULT_LANGUAGE = 'HU'
-const FALLBACK_LANGUAGE = 'EN'
-const SUPPORTED_LANGUAGES = ['HU', 'EN']
-
-function normalizeLanguage(language) {
-  if (!language || typeof language !== 'string') return DEFAULT_LANGUAGE
-  const normalized = language.toUpperCase().trim()
-  return SUPPORTED_LANGUAGES.includes(normalized) ? normalized : DEFAULT_LANGUAGE
+// base for {key} based dynamic texts
+const baseDynamicTexts = {
+  '{desc}': 'No desc',
 }
 
-function getNestedValue(obj, path) {
-  if (!path || typeof path !== 'string') return undefined
-  return path.split('.').reduce((current, key) => {
-    if (!current || typeof current !== 'object') return undefined
-    return current[key]
-  }, obj)
-}
-
-function applyParams(text, params = {}) {
-  if (typeof text !== 'string') return text
-  return text.replace(/\{(\w+)\}/g, (_, token) => {
-    const value = params[token]
-    return value === undefined || value === null ? `{${token}}` : String(value)
-  })
-}
-
-export function getLanguage() {
-  if (typeof window === 'undefined') return DEFAULT_LANGUAGE
-  const saved = window.localStorage.getItem(STORAGE_KEY)
-  return normalizeLanguage(saved)
-}
-
-export function setLanguage(language) {
-  const normalized = normalizeLanguage(language)
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, normalized)
-  }
-  return normalized
-}
-
-export function t(key, language = getLanguage(), params = {}) {
-  const entry = getNestedValue(langDictionary, key)
-  if (!entry) return key
-
-  if (typeof entry === 'string') {
-    return applyParams(entry, params)
+// translates based on dictionary AND replaces placeholders
+// usage: translateKey('settings', {"{desc}": "Hablablablablublublubhablublublbublbululu"})
+function translateKey(translationKey, dynamicTexts = baseDynamicTexts) {
+  const lang = getData('user_settings/language')
+  const key = translationDictonary[translationKey]
+  let translation = key ? key[lang] : translationKey
+  for (const placeholder in baseDynamicTexts) {
+    // replace placeholders
+    translation = translation.replace(
+      placeholder,
+      dynamicTexts[placeholder] || baseDynamicTexts[placeholder],
+    )
   }
 
-  const normalizedLanguage = normalizeLanguage(language)
-  const text =
-    entry[normalizedLanguage] ??
-    entry[DEFAULT_LANGUAGE] ??
-    entry[FALLBACK_LANGUAGE] ??
-    Object.values(entry)[0]
-
-  if (typeof text !== 'string') return key
-  return applyParams(text, params)
+  return translation
 }
 
-export default t
-
-
-
-
-
-`igy hasznlajatok 
-    import t, { setLanguage } from '@/data/translate'
-
-    <h1>{{ t('test', lang) }}</h1>
-    <button @click="switchLanguage">
-      Switch language ({{ lang }})
-    </button>
-
-    const lang = ref(getLanguage())
-
-    function switchLanguage() {
-      const next = lang.value === 'HU' ? 'EN' : 'HU'
-      lang.value = setLanguage(next)
-}
-`
+export { translateKey, baseDynamicTexts }

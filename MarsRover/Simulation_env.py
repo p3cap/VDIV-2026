@@ -3,29 +3,17 @@ import time
 from pathlib import Path
 
 MARS_ROVER_ROOT = Path(__file__).resolve().parent
-if str(MARS_ROVER_ROOT) not in sys.path:
-    sys.path.append(str(MARS_ROVER_ROOT))
+sys.path.append(str(MARS_ROVER_ROOT))
 
 from MapClass import Map, matrix_from_csv
 from RoverClass import Rover
 from Simulation import Simulation
 from RoverLogger import RoverLogger
 
-
 class RoverSimulationWorld:
     """Creates, resets, and steps the rover simulation world."""
 
-    def __init__(
-        self,
-        run_hrs: float = 24.0,
-        delta_mode: str = "set_time",
-        set_delta_hrs: float = 0.5,
-        tick_seconds: float = 0.0,
-        env_speed: float = 1.0,
-        web_logger: bool = False,
-        base_url: str = "http://127.0.0.1:8000",
-        send_every: int = 1,
-    ):
+    def __init__(self, run_hrs: float = 24.0, delta_mode: str = "set_time", set_delta_hrs: float = 0.5, tick_seconds: float = 0.0, env_speed: float = 1.0, web_logger: bool = False, base_url: str = "http://127.0.0.1:8000", send_every: int = 1,):
         self.run_hrs = run_hrs
         self.delta_mode = delta_mode
         self.set_delta_hrs = max(0.0, float(set_delta_hrs))

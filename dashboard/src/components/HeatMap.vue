@@ -5,7 +5,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue"
 import * as echarts from "echarts"
-import marsMap from '@/data/marsMap.json'
 
 const chartRef = ref(null)
 let chartInstance = null

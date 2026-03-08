@@ -5,26 +5,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
-import surface from '@/assets/textures/redsand.webp'
+import surface from '@/assets/textures/redsand.png'
 import stone from '@/assets/textures/stone.jpg'
 import lapis from '@/assets/textures/lapis.webp'
 import copper from '@/assets/textures/copper.webp'
 import gold from '@/assets/textures/gold.jpeg'
+import roverImg from '@/assets/rover.png'
+
+let roverTexture = null
+onMounted(async () => {
+  roverTexture = await Assets.load(roverImg)
+})
+
+
+
 
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
   pathPlan: { type: Array, default: () => [] },
   mapMatrix: { type: Array, default: () => [] },
+  mined: { type: Array, default: () => [] }
 })
 
 const pixiContainer = ref(null)
 const initialized = ref(false)
-const cellSize = ref(15) // Increased slightly for better visibility
-
+const cellSize = ref(16)
 
 let app = null
 let viewport = null
@@ -33,6 +42,7 @@ let rover = null
 let pathGraphics = null
 let textureMap = {}
 let cellNodes = []
+let grid = ref([])
 
 const texturePaths = {
   '.': surface,
@@ -40,33 +50,29 @@ const texturePaths = {
   'B': lapis,
   'Y': gold,
   'G': copper,
-  'S': '/textures/sand.png',
-}
-
-function getGrid() {
-  return Array.isArray(props.mapMatrix) ? props.mapMatrix : []
+  'S': surface,
 }
 
 onMounted(async () => {
   if (!pixiContainer.value) return
+  if (!props.mapMatrix?.length || !props.mapMatrix[0]?.length) return
 
-  const grid = getGrid()
-  if (!grid.length || !grid[0]?.length) return
+  grid.value = props.mapMatrix.map(row => [...row])
+
+  const rows = grid.value.length
+  const cols = grid.value[0].length
 
   app = new PIXI.Application()
-
   await app.init({
-    backgroundColor: 0x1e1e2e,
+    backgroundColor: 0x0f1623,
     resizeTo: pixiContainer.value,
     antialias: true,
     resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
+    autoDensity: true
   })
 
   pixiContainer.value.appendChild(app.canvas)
 
-  const cols = grid[0].length
-  const rows = grid.length
   const worldW = cols * cellSize.value
   const worldH = rows * cellSize.value
 
@@ -75,126 +81,97 @@ onMounted(async () => {
     screenHeight: app.screen.height,
     worldWidth: worldW,
     worldHeight: worldH,
-    events: app.renderer.events,
+    events: app.renderer.events
   })
 
-  // Better zoom/drag behavior to fill viewport
   viewport
     .drag()
     .wheel()
     .pinch()
     .decelerate()
-    .clampZoom({ 
-      minScale: 0.2, // Allow zooming out further
-      maxScale: 5.0 
-    })
+    .clampZoom({ minScale: 0.2, maxScale: 8 })
 
   app.stage.addChild(viewport)
-
   mapContainer = new PIXI.Container()
   viewport.addChild(mapContainer)
 
-  textureMap = await loadTexturesWithFallback()
-  drawGrid(grid)
+  textureMap = await loadTextures()
+
+  drawFullGrid()
 
   pathGraphics = new PIXI.Graphics()
   mapContainer.addChild(pathGraphics)
 
-  rover = createRoverGraphics()
+  rover = createRover()
   mapContainer.addChild(rover)
 
   updateRoverPosition(props.roverPosition, true)
-  drawPath()
+  drawPath()           // initial draw
 
-  // Initial Framing
-  viewport.fit(true) 
+  viewport.fit(true)
   viewport.moveCenter(worldW / 2, worldH / 2)
 
   initialized.value = true
 
-  window.addEventListener('resize', forceResize)
+  window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', forceResize)
+  window.removeEventListener('resize', onResize)
   if (app) app.destroy(true, { children: true })
 })
 
-async function loadTexturesWithFallback() {
+async function loadTextures() {
   const map = {}
-  const loadPromises = Object.entries(texturePaths).map(async ([type, path]) => {
-    if (!path) {
-      map[type] = null
-      return
-    }
-    try {
-      map[type] = await Assets.load(path)
-    } catch {
-      map[type] = null
-    }
-  })
-  await Promise.allSettled(loadPromises)
+  for (const [key, path] of Object.entries(texturePaths)) {
+    try { map[key] = await Assets.load(path) }
+    catch { map[key] = null }
+  }
   return map
 }
 
-// REMOVED GAPS: No more -2 width or +1 offsets
-function createCell(type, x, y) {
-  const texture = textureMap[type]
-  let cell
+function drawFullGrid() {
+  cellNodes = Array.from({ length: grid.value.length }, () => Array(grid.value[0].length).fill(null))
 
-  if (texture) {
-    cell = new PIXI.Sprite(texture)
-    cell.width = cellSize.value
-    cell.height = cellSize.value
-    cell.position.set(x * cellSize.value, y * cellSize.value)
-  } else {
-    cell = new PIXI.Graphics()
-    cell
-      .rect(x * cellSize.value, y * cellSize.value, cellSize.value, cellSize.value)
-      .fill(getCellColor(type))
-  }
-
-  cell.cellType = type
-  return cell
-}
-
-function drawGrid(grid) {
-  const rows = grid.length
-  const cols = grid[0].length
-  cellNodes = Array.from({ length: rows }, () => Array(cols).fill(null))
-
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const cell = createCell(grid[y][x], x, y)
+  for (let y = 0; y < grid.value.length; y++) {
+    for (let x = 0; x < grid.value[y].length; x++) {
+      const cell = createCell(grid.value[y][x], x, y)
       cellNodes[y][x] = cell
       mapContainer.addChild(cell)
     }
   }
 }
 
-function createRoverGraphics() {
-  const cont = new PIXI.Container()
-  
-  // Rover body: slightly smaller than cell size to look good
-  const size = cellSize.value * 0.7
-  const body = new PIXI.Graphics()
-    .roundRect(0, 0, size, size, 4)
-    .fill(0xffffff)
-    .stroke({ width: 2, color: 0x000000 })
+function createCell(type, x, y) {
+  const tex = textureMap[type]
+  let cell
 
-  const dot = new PIXI.Graphics()
-    .circle(size/2, size/2, size/4)
-    .fill(0xe63946)
+  if (tex) {
+    cell = new PIXI.Sprite(tex)
+    cell.width = cellSize.value
+    cell.height = cellSize.value
+  } else {
+    cell = new PIXI.Graphics()
+    cell.rect(0, 0, cellSize.value, cellSize.value).fill(getColor(type))
+  }
 
-  cont.addChild(body, dot)
-  cont.pivot.set(size / 2, size / 2) // Center the pivot
-  return cont
+  cell.position.set(x * cellSize.value, y * cellSize.value)
+  cell.cellType = type
+  return cell
+}
+
+function createRover() {
+  const size = cellSize.value * 0.8
+  const sprite = new PIXI.Sprite(roverTexture)
+  sprite.width = size
+  sprite.height = size
+  sprite.anchor.set(0.5)
+  return sprite
 }
 
 function updateRoverPosition(pos, instant = false) {
-  if (!rover || !pos) return
+  if (!rover || !pos?.x && pos?.x !== 0) return
 
-  // CALCULATE CENTER: (Index * Size) + Half Size
   const tx = pos.x * cellSize.value + cellSize.value / 2
   const ty = pos.y * cellSize.value + cellSize.value / 2
 
@@ -203,20 +180,18 @@ function updateRoverPosition(pos, instant = false) {
     return
   }
 
-  const sx = rover.x
-  const sy = rover.y
+  const sx = rover.x, sy = rover.y
   const start = performance.now()
-  const duration = 300
+  const dur = 380
 
-  function animate(now) {
-    const t = Math.min((now - start) / duration, 1)
-    const ease = t * (2 - t) // Simple ease-out
+  function anim(now) {
+    const t = Math.min((now - start) / dur, 1)
+    const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2
     rover.x = sx + (tx - sx) * ease
     rover.y = sy + (ty - sy) * ease
-    if (t < 1) requestAnimationFrame(animate)
+    if (t < 1) requestAnimationFrame(anim)
   }
-
-  requestAnimationFrame(animate)
+  requestAnimationFrame(anim)
 }
 
 function drawPath() {
@@ -247,34 +222,58 @@ function drawPath() {
   }
 }
 
-function forceResize() {
-  if (!app || !viewport || !pixiContainer.value) return
-  const w = pixiContainer.value.clientWidth
-  const h = pixiContainer.value.clientHeight
+function onResize() {
+  if (!app || !viewport) return
+  const w = pixiContainer.value?.clientWidth ?? 800
+  const h = pixiContainer.value?.clientHeight ?? 600
   app.renderer.resize(w, h)
   viewport.resize(w, h)
 }
 
-function getCellColor(type) {
-  const colors = { '.': 0xbc6124, '#': 0x4a4a4a, 'B': 0x4cc9f0, 'Y': 0xffd700, 'G': 0x2ecc71, 'S': 0x333333 }
-  return colors[type] || 0x555555
+function getColor(type) {
+  const c = { '.': 0xb5651d, '#': 0x555555, 'B': 0x40c4ff, 'Y': 0xffd54f, 'G': 0x66bb6a, 'S': 0x8d6e63 }
+  return c[type] ?? 0x777777
 }
 
-watch(() => props.roverPosition, (newPos) => {
-  if (initialized.value) {
-    updateRoverPosition(newPos)
+// ─── Watches ────────────────────────────────────────────────
+
+watch(() => props.roverPosition, (nv) => {
+  if (initialized.value && nv) {
+    updateRoverPosition(nv)
     drawPath()
   }
 }, { deep: true })
 
-watch(() => props.mapMatrix, (newMatrix) => {
+watch(() => props.pathPlan, () => {
   if (initialized.value) {
-    // For simplicity, redraw the whole grid if matrix changes
-    mapContainer.removeChildren()
-    drawGrid(newMatrix)
-    mapContainer.addChild(pathGraphics)
-    mapContainer.addChild(rover)
+    console.log('[PATH WATCH] pathPlan changed → redrawing')
+    drawPath()
   }
+}, { deep: true, immediate: true })
+
+watch(() => props.mined, (mined) => {
+  if (!initialized.value || !Array.isArray(mined)) return
+
+  mined.forEach(({ x, y }) => {
+    if (
+      Number.isInteger(x) && Number.isInteger(y) &&
+      y >= 0 && y < grid.value.length &&
+      x >= 0 && x < grid.value[y].length &&
+      grid.value[y][x] !== '.' && grid.value[y][x] !== '#'
+    ) {
+      grid.value[y][x] = '.'
+
+      const old = cellNodes[y][x]
+      if (old?.parent) {
+        const idx = mapContainer.children.indexOf(old)
+        mapContainer.removeChild(old)
+        old.destroy()
+        const neu = createCell('.', x, y)
+        mapContainer.addChildAt(neu, idx)
+        cellNodes[y][x] = neu
+      }
+    }
+  })
 }, { deep: true })
 </script>
 
@@ -282,15 +281,11 @@ watch(() => props.mapMatrix, (newMatrix) => {
 .map-wrapper {
   width: 100%;
   height: 100%;
-  min-height: 400px;
-  background: #1a1a2e;
-  border-radius: 12px;
+  background: #0a0e1a;
   overflow: hidden;
 }
-
 .pixi-container {
   width: 100%;
   height: 100%;
-  display: block;
 }
 </style>

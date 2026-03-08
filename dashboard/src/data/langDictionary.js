@@ -1,18 +1,17 @@
 export default{
-    test: {
+    "test": {
         "HU" : "teszt",
         "EN" : "test",
-
     },
-    map: {
+    "map": {
         "HU" : "Térkép",
         "EN" : "Map"
     },
-    settings : {
+    "settings" : {
         "HU" : "Beállítások",
         "EN" : "Settings"
     },
-    dashboard : {
+    "dashboard" : {
         "HU" : "Vezérlőpult",
         "EN" : "Dashboard"
     }
