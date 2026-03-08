@@ -4,8 +4,12 @@ import NavComponent from './components/NavComponent.vue';
 </script>
 
 <template>
-  <router-view />
-  <NavComponent />
+  <div class="view">
+    <router-view />
+  </div>
+  <div class="nav">
+    <NavComponent />
+  </div>
 </template>
 
 <style>
@@ -16,5 +20,19 @@ body {
   background: black;
   color: white;
 
+}
+.view {
+  position: relative;
+  width: 97vw;
+  height: 100vh;
+  float: right;
+}
+.nav {
+  position: relative;
+  top: 0;
+  right: 0;
+  width: 3vw;
+  height: 100vh;
+  background: #07080c;
 }
 </style>
