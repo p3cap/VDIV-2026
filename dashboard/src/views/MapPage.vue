@@ -1,6 +1,5 @@
 <script>
 import MapComponent from "@/components/MapComponent.vue";
-import marsMap from "@/data/marsMap.json";
 
 export default {
   name: "MapTestPage",
@@ -10,28 +9,10 @@ export default {
     return {
       dashboard: null,
       setupData: null,
-      fallbackMapMatrix: marsMap.grid || [],
       ws: null,
       reconnectTimer: null,
       isUnmounting: false,
     };
-  },
-
-  computed: {
-    mapMatrixToRender() {
-      return this.setupData?.map_matrix?.length
-        ? this.setupData.map_matrix
-        : this.fallbackMapMatrix;
-    },
-    roverPositionToRender() {
-      return this.dashboard?.rover_position || { x: 0, y: 0 };
-    },
-    pathPlanToRender() {
-      return this.dashboard?.path_plan || [];
-    },
-    isUsingFallbackMap() {
-      return !this.setupData?.map_matrix?.length;
-    },
   },
 
   methods: {
@@ -109,15 +90,12 @@ export default {
 <template>
   <div class="map-container">
     <MapComponent
-      v-if="mapMatrixToRender.length"
-      :roverPosition="roverPositionToRender"
-      :pathPlan="pathPlanToRender"
-      :mapMatrix="mapMatrixToRender"
+      v-if="setupData?.map_matrix?.length && dashboard?.rover_position"
+      :roverPosition="dashboard.rover_position || { x: 0, y: 0 }"
+      :pathPlan="dashboard.path_plan || []"
+      :mapMatrix="setupData.map_matrix"
     />
-    <div v-else class="loader">Map data is not available yet.</div>
-    <div v-if="isUsingFallbackMap" class="hint">
-      Showing local map fallback. Start rover/server data stream for live map setup.
-    </div>
+    <div v-else class="loader">Kapcsolodas a szerverhez...</div>
   </div>
 </template>
 
@@ -133,19 +111,7 @@ h1 {
   padding: 50px;
 }
 
-.hint {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  color: #d6d6d6;
-  font-size: 12px;
-}
-
 .map-container {
-  position: relative;
   display: flex;
   flex-direction: row;
   width: 100vw;
