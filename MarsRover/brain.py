@@ -5,23 +5,26 @@ from Global import Vector2
 
 import time
 import os
+import sys
+import requests
 
 # -------------------------
-# C++ modul betöltés
+# DLL path beállítás ELŐBB
 # -------------------------
 msys_path = r"C:\msys64\ucrt64\bin"
 if os.path.exists(msys_path):
     os.add_dll_directory(msys_path)
 
+# Ha a cpp_path.pyd nem ugyanabban a mappában van, mint a brain.py,
+# akkor ide add hozzá a tényleges mappáját
+sys.path.append(os.path.dirname(__file__))
+
 import cpp_path as cpp_mod
 
 
-# -------------------------
-# Konfig
-# -------------------------
 CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
+SERVER_URL = "http://127.0.0.1:8000"
 
-# Ha a feladatban más értékek vannak az érctípusokra, itt írd át
 ORE_VALUES = {
     "Y": 1,
     "G": 1,
@@ -29,16 +32,18 @@ ORE_VALUES = {
 }
 
 
-# -------------------------
-# Map + Simulation + Rover
-# -------------------------
+msys_path = r"C:\msys64\ucrt64\bin"
+if os.path.exists(msys_path):
+    os.add_dll_directory(msys_path)
+
+
 map_obj = Map(
     map_data=matrix_from_csv(CSV_PATH)
 )
 
 sim = Simulation(
     map_obj=map_obj,
-    sim_time_multiplier=15000,
+    sim_time_multiplier=20,   # FONTOS: ne legyen brutál gyors
     run_hrs=24.0,
     day_hrs=16.0,
     night_hrs=8.0,
@@ -51,19 +56,6 @@ rover = Rover(
 
 rover.pos = Vector2(0, 0)
 rover.gear = GEARS.NORMAL
-
-
-# -------------------------
-# Segédfüggvények
-# -------------------------
-def server_step(dt=0.5, sleep_sec=0.01):
-    sim.update(dt)
-    rover.update(dt)
-    time.sleep(sleep_sec)
-
-
-def same_pos_vec_and_tuple(vec: Vector2, xy: tuple[int, int]) -> bool:
-    return vec.x == xy[0] and vec.y == xy[1]
 
 
 def get_all_ores():
@@ -84,10 +76,6 @@ def get_all_ores():
 
 
 def get_cpp_path(start_xy, goal_xy):
-    """
-    C++ A* hívás.
-    Visszaad: [(x,y), (x,y), ...]
-    """
     try:
         return cpp_mod.astar_from_csv(CSV_PATH, start_xy, goal_xy)
     except Exception as e:
@@ -103,9 +91,6 @@ def get_path_and_length(start_xy, goal_xy):
 
 
 def cluster_bonus(target_ore, ores, radius=6):
-    """
-    Bónusz, ha a cél körül több másik érc is van.
-    """
     tx, ty = target_ore["pos"]
     bonus = 0
 
@@ -115,7 +100,6 @@ def cluster_bonus(target_ore, ores, radius=6):
 
         ox, oy = ore["pos"]
         manhattan = abs(tx - ox) + abs(ty - oy)
-
         if manhattan <= radius:
             bonus += 1
 
@@ -123,11 +107,6 @@ def cluster_bonus(target_ore, ores, radius=6):
 
 
 def choose_next_ore(current_pos_xy, ores):
-    """
-    Kiválasztja a következő célércet.
-
-    score = value*100 + cluster_bonus*10 - distance
-    """
     candidates = []
 
     for ore in ores:
@@ -153,55 +132,6 @@ def choose_next_ore(current_pos_xy, ores):
     return candidates[0]
 
 
-def move_rover_to(target_xy):
-    """
-    Megadjuk a rovernek a célt, és megvárjuk, míg odaér.
-    """
-    target_vec = Vector2(target_xy[0], target_xy[1])
-    rover.path_find_to(target_vec)
-
-    max_steps = 20000
-    steps = 0
-
-    while not same_pos_vec_and_tuple(rover.pos, target_xy):
-        server_step()
-        steps += 1
-
-        if steps >= max_steps:
-            print("Mozgás timeout:", target_xy)
-            return False
-
-        if rover.battery <= 0:
-            print("Lemerült mozgás közben.")
-            return False
-
-    return True
-
-
-def mine_current_tile():
-    """
-    Elindítja a bányászatot, majd megvárja a végét.
-    """
-    rover.mine()
-
-    max_steps = 20000
-    steps = 0
-
-    while rover.status == STATUS.MINE:
-        server_step()
-        steps += 1
-
-        if steps >= max_steps:
-            print("Bányászás timeout.")
-            return False
-
-        if rover.battery <= 0:
-            print("Lemerült bányászás közben.")
-            return False
-
-    return True
-
-
 def remove_mined_ore(ores, pos_xy):
     for i, ore in enumerate(ores):
         if ore["pos"] == pos_xy:
@@ -210,14 +140,130 @@ def remove_mined_ore(ores, pos_xy):
     return False
 
 
-# -------------------------
-# Főprogram
-# -------------------------
+def     ():
+    try:
+        requests.post(
+            f"{SERVER_URL}/send_setup",
+            json={"map_matrix": map_obj.map_data},
+            timeout=2,
+        )
+    except Exception as e:
+        print("send_setup hiba:", e)
+
+
+def send_live_data(current_target=None, planned_path=None):
+    try:
+        data = {
+            "rover_position": {"x": rover.pos.x, "y": rover.pos.y},
+            "status": str(rover.status),
+            "rover_battery": rover.battery,
+            "current_target": (
+                {"x": current_target[0], "y": current_target[1]}
+                if current_target is not None else None
+            ),
+            "path_plan": (
+                [{"x": x, "y": y} for x, y in planned_path]
+                if planned_path is not None else []
+            ),
+        }
+
+        requests.post(
+            f"{SERVER_URL}/send_data",
+            json=data,
+            timeout=2,
+        )
+    except Exception as e:
+        print("send_data hiba:", e)
+
+
+def same_pos_vec_and_tuple(vec, xy):
+    return vec.x == xy[0] and vec.y == xy[1]
+
+
+def step_sim(current_target=None, planned_path=None, dt=0.5, sleep_sec=0.15):
+    sim.update(dt)
+    rover.update(dt)
+    send_live_data(current_target=current_target, planned_path=planned_path)
+    time.sleep(sleep_sec)
+
+
+def move_rover_to(target_xy, planned_path):
+    target_vec = Vector2(target_xy[0], target_xy[1])
+    rover.path_find_to(target_vec)
+
+    max_steps = 5000
+    stuck_steps = 0
+    last_pos = (rover.pos.x, rover.pos.y)
+
+    while not same_pos_vec_and_tuple(rover.pos, target_xy):
+        step_sim(current_target=target_xy, planned_path=planned_path)
+
+        current_pos = (rover.pos.x, rover.pos.y)
+
+        if rover.battery <= 0:
+            print("Lemerült mozgás közben.")
+            return False
+
+        if current_pos == last_pos:
+            stuck_steps += 1
+        else:
+            stuck_steps = 0
+
+        last_pos = current_pos
+
+        if stuck_steps >= 80:
+            print("A rover nem halad tovább.")
+            return False
+
+        max_steps -= 1
+        if max_steps <= 0:
+            print("Mozgás timeout.")
+            return False
+
+    return True
+
+
+def mine_current_tile(target_xy, planned_path):
+    rover.mine()
+
+    max_steps = 5000
+    stuck_steps = 0
+    last_status = rover.status
+
+    while rover.status == STATUS.MINE:
+        step_sim(current_target=target_xy, planned_path=planned_path)
+
+        if rover.battery <= 0:
+            print("Lemerült bányászás közben.")
+            return False
+
+        if rover.status == last_status:
+            stuck_steps += 1
+        else:
+            stuck_steps = 0
+
+        last_status = rover.status
+
+        if stuck_steps >= 80:
+            print("A bányászás nem halad tovább.")
+            return False
+
+        max_steps -= 1
+        if max_steps <= 0:
+            print("Bányászás timeout.")
+            return False
+
+    return True
+
+
 def main():
     ores = get_all_ores()
 
     print("Talált ércek száma:", len(ores))
     print("Kezdő pozíció:", rover.pos.x, rover.pos.y)
+
+    send_setup()
+    send_live_data()
 
     mined_count = 0
 
@@ -231,32 +277,38 @@ def main():
 
         target_ore = best["ore"]
         target_xy = target_ore["pos"]
+        planned_path = best["path"]
 
         print(
             f"Következő cél: {target_xy}, "
             f"típus: {target_ore['type']}, "
-            f"dist: {best['dist']}, "
-            f"cluster_bonus: {best['bonus']}, "
-            f"score: {best['score']}"
+            f"dist: {best['dist']}"
         )
 
-        # 1) odamegyünk
-        ok_move = move_rover_to(target_xy)
+        # egyszer elküldjük az új célt
+        send_live_data(current_target=target_xy, planned_path=planned_path)
+
+        ok_move = move_rover_to(target_xy, planned_path)
         if not ok_move:
             break
 
-        # 2) bányászás
-        ok_mine = mine_current_tile()
+        ok_mine = mine_current_tile(target_xy, planned_path)
         if not ok_mine:
             break
 
-        # 3) töröljük a kibányászott ércet a listából
         removed = remove_mined_ore(ores, target_xy)
         if removed:
             mined_count += 1
             print(f"Kibányászva: {target_xy} | Összesen kibányászva: {mined_count}")
         else:
-            print("Figyelem: a kibányászott érc nem volt benne a listában:", target_xy)
+            print("Nem sikerült törölni a kibányászott ércet:", target_xy)
+
+        # a mapon is tüntesd el, ha kell
+        x, y = target_xy
+        map_obj.map_data[y][x] = "."
+
+        # frissített állapot kiküldése a bányászás után
+        send_live_data(current_target=None, planned_path=[])
 
     print("Vége.")
     print("Maradék battery:", rover.battery)
