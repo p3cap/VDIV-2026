@@ -114,7 +114,7 @@ onMounted(() => {
   left: 0;
   top: 0;
   height: 100vh;
-  width: 68px;           
+  width: 3vw;           
   background: linear-gradient(280deg, #0099ff 0%, #62bbff 100%);
   overflow: hidden;
   z-index: 900;

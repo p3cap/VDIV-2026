@@ -29,9 +29,9 @@ export default {
     <MapComponent
       v-if="setupData?.map_matrix?.length && dashboard?.rover_position"
       :roverPosition="dashboard.rover_position || { x: 0, y: 0 }"
-      :pathPlan="dashboard.path_plan || []"
+      :pathPlan="dashboard.rover_path_plan || []"
       :mapMatrix="setupData.map_matrix"
-      :mined = "dashboard.mined || []"
+      :mined = "dashboard.rover_mined || []"
     />
     <div v-else class="loader">Kapcsolodas a szerverhez...</div>
   </div>
