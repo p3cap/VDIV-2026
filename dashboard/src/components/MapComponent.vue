@@ -9,8 +9,11 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
-import surface from '@/assets/textures/tile_1.png'
-
+import surface from '@/assets/textures/redsand.webp'
+import stone from '@/assets/textures/stone.jpg'
+import lapis from '@/assets/textures/lapis.webp'
+import copper from '@/assets/textures/copper.webp'
+import gold from '@/assets/textures/gold.jpeg'
 
 const props = defineProps({
   roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
@@ -33,10 +36,10 @@ let cellNodes = []
 
 const texturePaths = {
   '.': surface,
-  '#': '/textures/rock.png',
-  'B': '/textures/blue-crystal.png',
-  'Y': '/textures/yellow-gem.png',
-  'G': '/textures/green-plant.png',
+  '#': stone,
+  'B': lapis,
+  'Y': gold,
+  'G': copper,
   'S': '/textures/sand.png',
 }
 

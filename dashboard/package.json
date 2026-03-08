@@ -15,6 +15,7 @@
     "lucide-vue-next": "^0.575.0",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.16.0",
+    "three": "^0.183.2",
     "vue": "^3.5.28",
     "vue-router": "^5.0.2"
   },
