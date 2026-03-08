@@ -1,4 +1,4 @@
-# ML Inputs, outputs
+# Machine Learning Inputs, outputs
 ## concept:
 Cutom rover env
 give rover basic info

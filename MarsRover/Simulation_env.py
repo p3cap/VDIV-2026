@@ -2,7 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-MARS_ROVER_ROOT = Path(__file__).parent.parent
+MARS_ROVER_ROOT = Path(__file__).resolve().parent
 if str(MARS_ROVER_ROOT) not in sys.path:
     sys.path.append(str(MARS_ROVER_ROOT))
 
@@ -93,5 +93,3 @@ class RoverSimulationWorld:
     def close(self):
         if self.websocket_logger is not None:
             self.websocket_logger.close()
-
-    

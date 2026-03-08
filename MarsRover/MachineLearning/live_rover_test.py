@@ -8,8 +8,7 @@ import requests
 from stable_baselines3 import PPO
 
 MARS_ROVER_ROOT = Path(__file__).parent.parent
-if str(MARS_ROVER_ROOT) not in sys.path:
-    sys.path.append(str(MARS_ROVER_ROOT))
+sys.path.append(str(MARS_ROVER_ROOT))
 
 from RoverClass import GEARS, STATUS
 from Simulation_env import RoverSimulationWorld
