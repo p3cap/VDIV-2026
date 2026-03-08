@@ -279,13 +279,13 @@ class Rover:
 			"rover_position": self.pos._dict(),
 			"rover_battery": self.battery,
 			"rover_storage": self.storage,
-			"speed": self.gear.value,
-			"status": self.status.name,
-			"distance_travelled": self.distance_travelled,
-			"path_plan": [v._dict() for v in self.path],
+			"rover_speed": self.gear.value,
+			"rover_status": self.status.name,
+			"rover_distance_travelled": self.distance_travelled,
+			"rover_path_plan": [v._dict() for v in self.path],
 			"rover_energy_consumption" : self.energy_consumed(delta_hrs),
 			"rover_energy_production" : self.energy_produced(delta_hrs),
-			"mined": self.mined
+			"rover_mined": self.mined
 		}
 
 	def get_setup_data(self) -> dict:
