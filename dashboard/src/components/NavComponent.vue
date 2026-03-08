@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Settings, Earth, ChartNoAxesCombined } from 'lucide-vue-next'
+import { Settings, Earth, ChartNoAxesCombined, Info } from 'lucide-vue-next'
 import { animate, stagger } from 'animejs'
 
 const isExpanded = ref(false)
@@ -9,7 +9,8 @@ const isExpanded = ref(false)
 const menuItems = [
   { id: 'map',        to: '/',                  icon: Earth,               label: 'Map'       },
   { id: 'dashboard',  to: '/dashboard',         icon: ChartNoAxesCombined, label: 'Dashboard'    },
-  { id: 'settings',   to: '/settings',          icon: Settings,            label: 'Settings'   },
+  { id: 'about',   to: '/about',             icon: Info,                label: 'About us'   },
+  { id: 'settings',   to: '/settings',          icon: Settings,            label: 'Settings'   }
 ]
 
 const sidebarRef = ref(null)
