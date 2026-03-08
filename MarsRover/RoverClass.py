@@ -47,7 +47,7 @@ class Rover:
 		self.battery = 100.0
 		self.status = STATUS.IDLE
 
-		self.pos = self.sim.map_obj.get_poses_of_tile(self.sim.map_obj.rover_marker, limit=1) # get pos on map
+		self.pos = self.sim.map_obj.get_poses_of_tiles([self.sim.map_obj.rover_marker], limit=1) # get pos on map
 		self.start_pos = self.pos
 		
 		self.path:Path = [] # the desired path the robot is going to follow
@@ -120,7 +120,7 @@ class Rover:
 		if isinstance(start, (tuple, list)):
 			start = Vector2(start[0], start[1])
 		if isinstance(goal, (tuple, list)):
-			goal = Vector2(goal[0], goal[1]) # TODO REVISE!!!!!!!!!!!!!!!! a cucc nem mindig találja meg a legjobbat
+			goal = Vector2(goal[0], goal[1])
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
@@ -153,7 +153,62 @@ class Rover:
 		path.reverse()
 		return path, len(path)
 
-	
+	def astar_to_any(self, start: Vector2, goals):
+		if isinstance(start, (tuple, list)):
+			start = Vector2(start[0], start[1])
+
+		goal_list = []
+		for goal in goals:
+			if isinstance(goal, (tuple, list)):
+				goal_list.append(Vector2(goal[0], goal[1]))
+			else:
+				goal_list.append(goal)
+
+		if not goal_list:
+			return None, [], float("inf")
+
+		goal_set = set(goal_list)
+		if start in goal_set:
+			return start, [], 0
+
+		def heuristic_to_goals(node: Vector2) -> int:
+			return min(self.heuristic(node, goal) for goal in goal_list)
+
+		open_set = []
+		heapq.heappush(open_set, (0, start))
+
+		came_from = {}
+		g_score = {start: 0}
+		found_goal = None
+
+		while open_set:
+			_, current = heapq.heappop(open_set)
+
+			if current in goal_set:
+				found_goal = current
+				break
+
+			for neighbor in self.get_neighbors(current):
+				tentative = g_score[current] + 16
+
+				if neighbor not in g_score or tentative < g_score[neighbor]:
+					came_from[neighbor] = current
+					g_score[neighbor] = tentative
+					f = tentative + heuristic_to_goals(neighbor)
+					heapq.heappush(open_set, (f, neighbor))
+
+		if found_goal is None:
+			return None, [], float("inf")
+
+		path = []
+		cur = found_goal
+		while cur in came_from:
+			path.append(cur)
+			cur = came_from[cur]
+
+		path.reverse()
+		return found_goal, path, len(path)
+
 	def path_find_to(self, goal: Vector2) -> list[Vector2]:
 		if self.status != STATUS.IDLE: return
 		if isinstance(goal, (tuple, list)):
@@ -189,7 +244,7 @@ class Rover:
 # ---------------- FRAME UPDATE ----------------
 
 	def update(self, delta_hrs:float):
-		if not self.sim.is_running: print("Rover stopped: Simulation not running"); return
+		if not self.sim.is_running: return #print("Rover stopped: Simulation not running");đ
 		if delta_hrs <= 0: return # don't calcaute for no reason
 
 		if self.status == STATUS.MOVE and self.path:
@@ -264,7 +319,7 @@ class Rover:
 			"rover_mode": "machine_learning", # Will be the type of algory
 		}
 
-	# ---------- Self print Formatter --------------
+# ---------- Self print Formatter --------------
 	def __repr__(self):
 		line = "=" * 40
 		

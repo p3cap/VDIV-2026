@@ -1,217 +1,192 @@
-import os
+import argparse
 import sys
-import time
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import requests
+from stable_baselines3 import PPO
 
-# Resolve imports when launched from project root or MachineLearning folder.
-ML_DIR = Path(__file__).resolve().parent
-ROOT_DIR = ML_DIR.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-if str(ML_DIR) not in sys.path:
-    sys.path.insert(0, str(ML_DIR))
+MARS_ROVER_ROOT = Path(__file__).parent.parent
+if str(MARS_ROVER_ROOT) not in sys.path:
+    sys.path.append(str(MARS_ROVER_ROOT))
 
-from dqn_lib import DQNAgent
-from Global import Vector2
-from MapClass import Map, matrix_from_csv
-from RoverClass import Rover, STATUS, GEARS
-from Simulation import Simulation
+from RoverClass import GEARS, STATUS
+from Simulation_env import RoverSimulationWorld
+
+ML_ROOT = Path(__file__).parent
+GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}
 
 
-class RoverDQNController:
-    """Uses the trained DQN to pick which mineral type to target next."""
+def ts_print(message: str):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
-    def __init__(self, rover: Rover, sim: Simulation, model_path: Path):
-        self.rover = rover
-        self.sim = sim
-        self.map_obj = sim.map_obj
-        self.minerals = ["B", "Y", "G"]
 
-        # Must match training setup in dqn_rover_test.py
-        self.state_dim = 14
-        self.action_dim = 3
-        self.agent = DQNAgent(
-            state_dim=self.state_dim,
-            action_dim=self.action_dim,
-            lr=5e-4,
-            gamma=0.99,
-            hidden_sizes=(128, 128),
+class LivePolicyEnv:
+    """Minimal policy inference wrapper over RoverSimulationWorld."""
+
+    def __init__(
+        self,
+        run_hrs: float,
+        mineral_count: int,
+        delta_mode: str,
+        set_delta_hrs: float,
+        tick_seconds: float,
+        env_speed: float,
+        base_url: str,
+        send_every: int,
+    ):
+        self.mineral_count = mineral_count
+        self.prev_mined = None
+        self.world = RoverSimulationWorld(
+            run_hrs=run_hrs,
+            delta_mode=delta_mode,
+            set_delta_hrs=set_delta_hrs,
+            tick_seconds=tick_seconds,
+            env_speed=env_speed,
+            web_logger=True,
+            base_url=base_url,
+            send_every=send_every,
         )
-        self.agent.load(str(model_path))
-        self.agent.q_net.eval()
+        self.obs_size = 9 + (self.mineral_count * 3)
 
-    def nearest_tile(self, marker: str) -> Optional[Vector2]:
-        candidates = self.map_obj.get_poses_of_tile(marker)
-        if not candidates:
-            return None
-        return min(candidates, key=lambda p: abs(p.x - self.rover.pos.x) + abs(p.y - self.rover.pos.y))
+    def _ranked_minerals(self):
+        rover = self.world.rover
+        ranked = []
+        for mineral in self.world.minerals():
+            _, dist = rover.astar(rover.pos, mineral)
+            if dist == 0 and mineral != rover.pos:
+                dist = float("inf")
+            ranked.append((mineral, float(dist)))
+        ranked.sort(key=lambda item: (item[1], item[0].x, item[0].y))
+        return ranked[: self.mineral_count]
 
-    def remaining_minerals(self) -> int:
-        return sum(len(self.map_obj.get_poses_of_tile(m)) for m in self.minerals)
+    def obs(self):
+        rover = self.world.rover
+        sim = self.world.sim
+        obs = np.zeros(self.obs_size, dtype=np.float32)
+        cycle = sim.day_hrs + sim.night_hrs
+        inv_w = self.world.inv_w
+        inv_h = self.world.inv_h
 
-    def build_state(self) -> np.ndarray:
-        width = max(1, self.map_obj.width - 1)
-        height = max(1, self.map_obj.height - 1)
-        cycle = self.sim.day_hrs + self.sim.night_hrs
+        obs[0] = rover.pos.x * inv_w
+        obs[1] = rover.pos.y * inv_h
+        obs[2] = rover.battery / rover.MAX_BATTERY_CHARGE
+        obs[3] = min(1.0, self.world.run_hrs / 240.0)
+        obs[4] = GEAR_TO_FLOAT[rover.gear]
+        obs[5] = (sim.elapsed_hrs % cycle) / cycle
+        px = self.prev_mined.x if self.prev_mined is not None else 0
+        py = self.prev_mined.y if self.prev_mined is not None else 0
+        obs[6] = px * inv_w
+        obs[7] = py * inv_h
+        obs[8] = min(1.0, sum(rover.storage.values()) / (self.mineral_count * 100))
 
-        features = [
-            self.rover.pos.x / width,
-            self.rover.pos.y / height,
-            self.rover.battery / self.rover.MAX_BATTERY_CHARGE,
-            (self.sim.elapsed_hrs % cycle) / cycle,
-            float(self.sim.is_day),
-            float(self.rover.status == STATUS.IDLE),
-            float(self.rover.status == STATUS.MOVE),
-            float(self.rover.status == STATUS.MINE),
-        ]
+        ranked = self._ranked_minerals()
+        for i in range(self.mineral_count):
+            base = 9 + (i * 3)
+            if i >= len(ranked):
+                break
+            pos, dist = ranked[i]
+            obs[base] = 1.0 if not np.isfinite(dist) else min(1.0, dist / self.world.max_dist)
+            obs[base + 1] = pos.x * inv_w
+            obs[base + 2] = pos.y * inv_h
+        return obs
 
-        max_dist = max(1.0, float(self.map_obj.width + self.map_obj.height))
-        for marker in self.minerals:
-            tile = self.nearest_tile(marker)
-            if tile is None:
-                features.append(1.0)
-                features.append(0.0)
-            else:
-                dist = abs(tile.x - self.rover.pos.x) + abs(tile.y - self.rover.pos.y)
-                features.append(dist / max_dist)
-                features.append(1.0)
+    def step(self, action: int) -> tuple[bool, float, float]:
+        rover = self.world.rover
 
-        return np.array(features, dtype=np.float32)
+        if action == 0:
+            rover.gear = GEARS.SLOW
+        elif action == 1:
+            rover.gear = GEARS.NORMAL
+        elif action == 2:
+            rover.gear = GEARS.FAST
+        elif 3 <= action < 3 + self.mineral_count and rover.status == STATUS.IDLE:
+            idx = action - 3
+            ranked = self._ranked_minerals()
+            if idx < len(ranked):
+                target, _ = ranked[idx]
+                planned = rover.path_find_to(target)
+                if planned:
+                    self.prev_mined = target
+        elif action == 3 + self.mineral_count and rover.status == STATUS.IDLE:
+            rover.mine()
 
-    def choose_target(self) -> Optional[Vector2]:
-        # 1) greedy DQN action
-        action = self.agent.act(self.build_state(), epsilon=0.0)
-
-        # 2) preferred mineral
-        preferred = self.nearest_tile(self.minerals[action])
-        if preferred is not None:
-            return preferred
-
-        # 3) fallback if preferred type is exhausted
-        for marker in self.minerals:
-            fallback = self.nearest_tile(marker)
-            if fallback is not None:
-                return fallback
-        return None
+        delta_hrs, real_dt_seconds = self.world.step(sleep=True)
+        sim = self.world.sim
+        done = (rover.status == STATUS.DEAD) or (len(self.world.minerals()) == 0) or (not sim.is_running)
+        return done, delta_hrs, real_dt_seconds
 
 
-def post_json(url: str, endpoint: str, payload: dict):
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run trained PPO model as live rover logger.")
+    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000")
+    parser.add_argument("--steps", type=int, default=0)
+    parser.add_argument("--delta-mode", type=str, choices=["set_time", "real_time"], default="set_time")
+    parser.add_argument("--delta-hrs", type=float, default=0.5, help="Used in set_time mode.")
+    parser.add_argument("--tick-seconds", type=float, default=1.0, help="Loop interval in seconds.")
+    parser.add_argument("--env-speed", type=float, default=1.0, help="Used in real_time mode.")
+    parser.add_argument("--send-every", type=int, default=1)
+    parser.add_argument("--run-hrs", type=float, default=24.0)
+    parser.add_argument("--deterministic", action="store_true")
+    return parser.parse_args()
+
+
+def choose_model_base() -> str:
+    trained_dir = ML_ROOT / "trained"
+    models = sorted(trained_dir.glob("*.zip"))
+    print("\nAvailable models:")
+    for idx, model_file in enumerate(models, start=1):
+        print(f"  {idx}. {model_file.stem}")
+    print()
+    name = input("Model name: ").strip()
+    if name.lower().endswith(".zip"):
+        name = name[:-4]
+    return str(trained_dir / name)
+
+
+def main():
+    args = parse_args()
+    model_base = choose_model_base()
+    model = PPO.load(model_base)
+
+    obs_size = int(model.observation_space.shape[0])
+    mineral_count = max(1, (obs_size - 9) // 3)
+    env = LivePolicyEnv(
+        run_hrs=args.run_hrs,
+        mineral_count=mineral_count,
+        delta_mode=args.delta_mode,
+        set_delta_hrs=args.delta_hrs,
+        tick_seconds=args.tick_seconds,
+        env_speed=args.env_speed,
+        base_url=args.base_url,
+        send_every=args.send_every,
+    )
+    obs = env.obs()
+    step = 0
+
     try:
-        response = requests.post(f"{url}{endpoint}", json=payload, timeout=3)
-        response.raise_for_status()
-        return response
-    except requests.exceptions.RequestException as exc:
-        print(f"POST failed {endpoint}: {exc}")
-        return None
+        while True:
+            step += 1
 
+            action, _ = model.predict(obs, deterministic=args.deterministic)
+            done, delta_hrs, real_dt = env.step(int(action))
+            obs = env.obs()
 
-def advance_world(sim: Simulation, rover: Rover, delta_hrs: float):
-    sim.update(delta_hrs)
-    # Normalize run-state semantics for live loop.
-    sim.is_running = sim.elapsed_hrs < sim.run_hrs
-    rover.update(delta_hrs)
+            sent_ok = env.world.last_send_ok
+
+            ts_print(
+                f"step={step} real_dt={real_dt:.3f}s sim_dt={delta_hrs:.5f}h "
+                f"pos=({env.world.rover.pos.x},{env.world.rover.pos.y}) status={env.world.rover.status.name} "
+                f"action={int(action)} sent={'ok' if sent_ok else 'failed'}"
+            )
+
+            if done or (args.steps > 0 and step >= args.steps):
+                break
+    finally:
+        env.world.close()
+        ts_print("logger closed.")
 
 
 if __name__ == "__main__":
-    url = "http://127.0.0.1:8000"
-
-    map_obj = Map(map_data=matrix_from_csv(str(ROOT_DIR / "data" / "mars_map_50x50.csv")))
-
-    sim = Simulation(
-        map_obj=map_obj,
-        sim_time_multiplier=15000,
-        run_hrs=240.0,
-        day_hrs=16.0,
-        night_hrs=8.0,
-    )
-
-    rover = Rover(id="dqn_live_rover", sim=sim)
-    rover.gear = GEARS.SLOW
-
-    model_path = ROOT_DIR / "MachineLearning" / "trained" / "rover_dqn.pth"
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model not found: {model_path}")
-
-    controller = RoverDQNController(rover=rover, sim=sim, model_path=model_path)
-
-    setup_data = {
-        "day_hrs": sim.day_hrs,
-        "night_hrs": sim.night_hrs,
-        "run_hrs": sim.run_hrs,
-        "sim_time_multiplier": sim.sim_time_multiplier,
-        "markers": {
-            "S": "Rover Start",
-            ".": "Field",
-            "#": "Barrier",
-            "Y": "Gold",
-            "B": "Ice",
-            "G": "Green",
-        },
-        "rover_name": rover.id,
-        "rover_max_battery": rover.MAX_BATTERY_CHARGE,
-        "rover_mining_consumption_per_hr": rover.MINING_CONSUMPTION_PER_HR,
-        "rover_standby_consumption_per_hr": rover.STANDBY_CONSUMPTION_PER_HR,
-        "rover_charge_per_hr": rover.DAY_CHARGE_PER_HR,
-        "rover_mine_hrs": rover.MINING_TIME_HRS,
-        "rover_mode": "machine_learning_dqn_live",
-        "map_matrix": map_obj.map_data,
-    }
-    post_json(url, "/send_setup", setup_data)
-
-    # Set first target immediately.
-    first_target = controller.choose_target()
-    if first_target is not None:
-        rover.path_find_to(first_target)
-
-    last_time = time.perf_counter()
-    while True:
-        now = time.perf_counter()
-        _delta_real = now - last_time
-        last_time = now
-
-        delta_hrs = 0.5
-        advance_world(sim, rover, delta_hrs)
-
-        if rover.status == STATUS.IDLE:
-            rover.mine()
-            next_target = controller.choose_target()
-            if next_target is not None:
-                rover.path_find_to(next_target)
-
-        if os.name == "nt":
-            os.system("cls")
-        else:
-            os.system("clear")
-
-        print(f"frame started with delta_hrs: {delta_hrs}")
-        print(rover)
-
-        live_data = {
-            "time_of_day": sim.elapsed_hrs % (sim.day_hrs + sim.night_hrs),
-            "rover_position": rover.pos._dict(),
-            "rover_battery": rover.battery,
-            "rover_storage": rover.storage,
-            "speed": rover.gear.value,
-            "status": rover.status.name,
-            "distance_travelled": rover.distance_travelled,
-            "mine_process_hrs": rover.mine_process_hrs,
-            "path_plan": [v._dict() for v in rover.path],
-        }
-        post_json(url, "/send_setup", setup_data)
-        post_json(url, "/send_data", live_data)
-
-        if rover.status == STATUS.DEAD:
-            print("Rover stopped: battery depleted")
-            break
-        if not sim.is_running:
-            print("Rover stopped: simulation run time reached")
-            break
-        if controller.remaining_minerals() == 0:
-            print("Rover stopped: all minerals mined")
-            break
-
-        time.sleep(1)
+    main()
