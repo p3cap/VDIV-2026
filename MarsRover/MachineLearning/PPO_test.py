@@ -24,7 +24,6 @@ from Simulation_env import RoverSimulationWorld
 
 GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}  # for rl input/output
 
-
 class MinuteProgressCallback(BaseCallback):
     def __init__(self, total_timesteps: int, log_every_seconds: int = 60, step_check_interval: int = 1024):
         super().__init__(verbose=0)
@@ -105,9 +104,6 @@ class RoverSimpleEnv(gym.Env):
         self._total_mined = 0
         self._refresh_minerals()
 
-    def _all_minerals(self):
-        return self._cached_minerals
-
     def _refresh_minerals(self):
         self._cached_minerals = list(self.world.minerals())
         self._minerals_version += 1
@@ -146,7 +142,7 @@ class RoverSimpleEnv(gym.Env):
         return True
 
     def _get_ranked_minerals(self):
-        minerals = self._all_minerals()
+        minerals = self._cached_minerals
         if not minerals:
             self._rank_cache_key = None
             self._rank_cache = []
@@ -274,17 +270,15 @@ class RoverSimpleEnv(gym.Env):
 
         battery_cost = max(0.0, prev_battery - rover.battery)
         dist_gain = rover.distance_travelled - prev_distance
-        minerals_left = len(self._all_minerals())
+        minerals_left = len(self._cached_minerals)
         is_dead = rover.status == STATUS.DEAD
         terminated = is_dead or (minerals_left == 0) or (not sim.is_running)
         reward = self._compute_reward(mined_now, dist_gain, battery_cost, minerals_left, is_dead)
 
         return self._obs(), float(reward), terminated, False, {}
 
-
 def resolve_device(device: str) -> str:  # device optimisation when training
     return "cuda" if device == "auto" and torch.cuda.is_available() else ("cpu" if device == "auto" else device)
-
 
 def tune_torch_runtime(device: str):
     if device != "cuda":
@@ -294,7 +288,6 @@ def tune_torch_runtime(device: str):
     torch.backends.cudnn.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
     torch.set_float32_matmul_precision("high")
-
 
 def choose_ppo_batch_params(n_envs: int) -> tuple[int, int]:
     # Throughput-oriented defaults: fewer optimizer phases per env step.
@@ -307,7 +300,6 @@ def choose_ppo_batch_params(n_envs: int) -> tuple[int, int]:
         batch_size //= 2
 
     return n_steps, max(32, batch_size)
-
 
 def compute_parallelism(device: str, cpu_limit: float, n_envs: int, torch_threads: int):
     cpu_limit = min(1.0, max(0.01, float(cpu_limit)))
@@ -322,13 +314,11 @@ def compute_parallelism(device: str, cpu_limit: float, n_envs: int, torch_thread
     torch_threads = min(max(1, int(torch_threads)), cpu_budget)
     return cpu_budget, n_envs, torch_threads
 
-
 def build_vec_env(n_envs: int):
     def make_env():
         return RoverSimpleEnv(mineral_count=1)
 
     return SubprocVecEnv([make_env for _ in range(n_envs)]) if n_envs > 1 else DummyVecEnv([make_env])
-
 
 def train_model(timesteps: int, out_path: str, device: str = "auto", cpu_limit: float = 1.0, n_envs: int = 0, torch_threads: int = 0):
     start_time = time.perf_counter()
