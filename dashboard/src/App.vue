@@ -21,18 +21,5 @@ body {
   color: white;
 
 }
-.view {
-  position: relative;
-  width: 97vw;
-  height: 100vh;
-  float: right;
-}
-.nav {
-  position: relative;
-  top: 0;
-  right: 0;
-  width: 3vw;
-  height: 100vh;
-  background: #07080c;
-}
+
 </style>

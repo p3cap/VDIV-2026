@@ -175,7 +175,7 @@ const storageEntries = computed(() =>
 /* ── Top bar ────────────────────────────────────────────────────────────── */
 .top-bar {
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0; left: 80px; right: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -228,8 +228,8 @@ const storageEntries = computed(() =>
   backdrop-filter: blur(7px);
   color: #bcc8d8;
 }
-.panel--left  { left: 14px; }
-.panel--right { right: 14px; }
+.panel--left  { left: 90px; }
+.panel--right { right: 60px; }
 
 .panel-title {
   margin: 0 0 8px;
