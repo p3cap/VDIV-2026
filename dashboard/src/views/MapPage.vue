@@ -1,7 +1,6 @@
-<script>
+﻿<script>
 import { useLiveWsStore } from "@/stores/liveWs.js";
 import MapComponent from "@/components/MapComponent.vue";
-
 export default {
   name: "MapTestPage",
   components: { MapComponent },
