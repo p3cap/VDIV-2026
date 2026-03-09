@@ -138,7 +138,7 @@ const markers    = computed(() => setup.value.markers     ?? {});
 .instruments-anchor {
   position: absolute;
   bottom: 20px;
-  right: 60px;
+  right: 14px;
   pointer-events: none;
   z-index: 10;
 }

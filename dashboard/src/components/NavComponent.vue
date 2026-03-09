@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Settings, Earth, ChartNoAxesCombined, Info, Rotate3d } from 'lucide-vue-next'
+import { Settings, Earth, ChartNoAxesCombined, Info } from 'lucide-vue-next'
 import { animate, stagger } from 'animejs'
 
 const isExpanded = ref(false)
@@ -9,7 +9,7 @@ const isExpanded = ref(false)
 const menuItems = [
   { id: 'map',        to: '/',                  icon: Earth,               label: 'Map'       },
   { id: 'dashboard',  to: '/dashboard',         icon: ChartNoAxesCombined, label: 'Dashboard'    },
-  { id: 'map3d',   to: '/map3d',             icon: Rotate3d,                label: '3d Map'   },
+  { id: 'about',   to: '/about',             icon: Info,                label: 'About us'   },
   { id: 'settings',   to: '/settings',          icon: Settings,            label: 'Settings'   }
 ]
 
@@ -114,7 +114,7 @@ onMounted(() => {
   left: 0;
   top: 0;
   height: 100vh;
-  width: 68px;           
+  width: 3vw;           
   background: linear-gradient(280deg, #0099ff 0%, #62bbff 100%);
   overflow: hidden;
   z-index: 900;

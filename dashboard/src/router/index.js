@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from "vue-router";
 import MapPage from "@/views/MapPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
+import AboutPage from "@/views/AboutPage.vue";
 import SettingsComponent from "@/components/SettingsComponent.vue";
 import { path } from "pixi.js";
-import Map3dPage from "@/views/Map3dPage.vue";
 
 const routes = [
   {
@@ -17,9 +17,9 @@ const routes = [
     component: DashboardPage,
   },
   {
-    path: "/map3d",
-    name: "map3d",
-    component: Map3dPage,
+    path: "/about",
+    name: "about",
+    component: AboutPage,
   },
   {
     path: "/settings",
