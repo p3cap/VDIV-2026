@@ -360,7 +360,7 @@ const storageEntries = computed(() =>
 /* ── Path badge ─────────────────────────────────────────────────────────── */
 .path-badge {
   position: absolute;
-  bottom: 16px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;

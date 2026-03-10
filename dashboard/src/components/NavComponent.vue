@@ -1,16 +1,18 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Settings, Earth, ChartNoAxesCombined, Info, Rotate3d } from 'lucide-vue-next'
+import { Settings, Earth, ChartNoAxesCombined, House, Rotate3d } from 'lucide-vue-next'
 import { animate, stagger } from 'animejs'
 
 const isExpanded = ref(false)
 
 const menuItems = [
+  { id: 'welcome',      to: '/welcome',             icon: House,                label: 'Welcome'      },
   { id: 'map',        to: '/',                  icon: Earth,               label: 'Map'       },
   { id: 'dashboard',  to: '/dashboard',         icon: ChartNoAxesCombined, label: 'Dashboard'    },
-  { id: 'map3d',   to: '/map3d',             icon: Rotate3d,                label: '3d Map'   },
+  { id: 'map3d',      to: '/map3d',                icon: Rotate3d,                label: '3d Map'   },
   { id: 'settings',   to: '/settings',          icon: Settings,            label: 'Settings'   }
+  
 ]
 
 const sidebarRef = ref(null)

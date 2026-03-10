@@ -2,8 +2,9 @@ import { createRouter, createWebHistory } from "vue-router";
 import MapPage from "@/views/MapPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
 import SettingsComponent from "@/components/SettingsComponent.vue";
-import { path } from "pixi.js";
 import Map3dPage from "@/views/Map3dPage.vue";
+import WelcomePage from "@/views/WelcomePage.vue";
+import { path } from "pixi.js";
 
 const routes = [
   {
@@ -25,6 +26,11 @@ const routes = [
     path: "/settings",
     name: "settings",
     component: SettingsComponent
+  },
+  {
+    path: "/welcome",
+    name: "welcome",
+    component: WelcomePage
   }
 ];
 
