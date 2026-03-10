@@ -8,11 +8,18 @@ from stable_baselines3 import PPO
 MARS_ROVER_ROOT = Path(__file__).parent.parent
 sys.path.append(str(MARS_ROVER_ROOT))
 
+from Global import Vector2
 from RoverClass import GEARS, STATUS
 from Simulation_env import RoverSimulationWorld
 
 ML_ROOT = Path(__file__).parent
 GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}
+FLOAT_TO_GEAR = {0.0: GEARS.SLOW, 0.5: GEARS.NORMAL, 1.0: GEARS.FAST}
+
+
+def snap_gear(value: float) -> GEARS:
+    snapped = min([0.0, 0.5, 1.0], key=lambda g: abs(g - float(value)))
+    return FLOAT_TO_GEAR[snapped]
 
 
 def ts_print(message: str):
@@ -35,18 +42,16 @@ class LivePolicyEnv:
             base_url=base_url,
             send_every=send_every,
         )
-        self.obs_size = 9 + (self.mineral_count * 3) # input size
+        self.obs_size = 8 + (self.mineral_count * 3) # input size
 
     def _ranked_minerals(self): # get mineral distances
         rover = self.world.rover
-        ranked = []
-        for mineral in self.world.minerals():
-            _, dist = rover.astar(rover.pos, mineral)
-            if dist == 0 and mineral != rover.pos:
-                dist = float("inf")
-            ranked.append((mineral, float(dist)))
-        ranked.sort(key=lambda item: (item[1], item[0].x, item[0].y))
-        return ranked[: self.mineral_count]
+        minerals = list(self.world.minerals())
+        if not minerals:
+            return []
+        rx, ry = rover.pos.x, rover.pos.y
+        ranked = sorted(minerals, key=lambda m: abs(m.x - rx) + abs(m.y - ry))
+        return [(m, float(abs(m.x - rx) + abs(m.y - ry))) for m in ranked[:self.mineral_count]]
 
     def obs(self): # NN Inputs
         rover = self.world.rover
@@ -56,48 +61,50 @@ class LivePolicyEnv:
         inv_w = self.world.inv_w
         inv_h = self.world.inv_h
 
-        obs[0] = rover.pos.x * inv_w
-        obs[1] = rover.pos.y * inv_h
-        obs[2] = rover.battery / rover.MAX_BATTERY_CHARGE
-        obs[3] = min(1.0, self.world.run_hrs / 240.0)
-        obs[4] = GEAR_TO_FLOAT[rover.gear]
-        obs[5] = (sim.elapsed_hrs % cycle) / cycle
+        obs[0] = rover.battery / rover.MAX_BATTERY_CHARGE
+        obs[1] = GEAR_TO_FLOAT[rover.gear]
+        obs[2] = min(1.0, self.world.run_hrs / 240.0)
+        obs[3] = (sim.elapsed_hrs % cycle) / cycle
+        obs[4] = rover.pos.x * inv_w
+        obs[5] = rover.pos.y * inv_h
         px = self.prev_mined.x if self.prev_mined is not None else 0
         py = self.prev_mined.y if self.prev_mined is not None else 0
         obs[6] = px * inv_w
         obs[7] = py * inv_h
-        obs[8] = min(1.0, sum(rover.storage.values()) / (self.mineral_count * 100))
 
         ranked = self._ranked_minerals()
+        max_d = float(self.world.map_width + self.world.map_height)
         for i in range(self.mineral_count):
-            base = 9 + (i * 3)
+            base = 8 + i * 3
             if i >= len(ranked):
                 break
             pos, dist = ranked[i]
-            obs[base] = 1.0 if not np.isfinite(dist) else min(1.0, dist / self.world.max_dist)
+            obs[base] = min(1.0, dist / max_d)
             obs[base + 1] = pos.x * inv_w
             obs[base + 2] = pos.y * inv_h
         return obs
 
-    def step(self, action: int) -> tuple[bool, float, float]:
+    def step(self, action: np.ndarray) -> tuple[bool, float, float]:
         rover = self.world.rover
 
-        if action == 0:
-            rover.gear = GEARS.SLOW
-        elif action == 1:
-            rover.gear = GEARS.NORMAL
-        elif action == 2:
-            rover.gear = GEARS.FAST
-        elif 3 <= action < 3 + self.mineral_count and rover.status == STATUS.IDLE:
-            idx = action - 3
-            ranked = self._ranked_minerals()
-            if idx < len(ranked):
-                target, _ = ranked[idx]
-                planned = rover.path_find_to(target)
-                if planned:
-                    self.prev_mined = target
-        elif action == 3 + self.mineral_count and rover.status == STATUS.IDLE:
-            rover.mine()
+        # gear applies every step
+        rover.gear = snap_gear(action[0])
+
+        # navigation / mining only when rover is free to receive a new command
+        if rover.status == STATUS.IDLE:
+            tile = self.world.sim.map_obj.get_tile(rover.pos)
+            if tile in self.world.sim.map_obj.mineral_markers:
+                rover.mine()
+            else:
+                gx = float(np.clip(action[1], 0.0, 1.0))
+                gy = float(np.clip(action[2], 0.0, 1.0))
+                tx = int(np.clip(round(gx * (self.world.map_width - 1)), 0, self.world.map_width - 1))
+                ty = int(np.clip(round(gy * (self.world.map_height - 1)), 0, self.world.map_height - 1))
+                target = Vector2(tx, ty)
+                if target != rover.pos:
+                    planned = rover.path_find_to(target)
+                    if planned:
+                        self.prev_mined = target
 
         delta_hrs, real_dt_seconds = self.world.step(sleep=True)
         sim = self.world.sim
@@ -127,13 +134,13 @@ def main():
     env_speed = 1.0
     send_every = 1
     run_hrs = 240.0
-    deterministic ="store_true"
+    deterministic = True
 
     model_base = choose_model_base()
     model = PPO.load(model_base)
 
     obs_size = int(model.observation_space.shape[0])
-    mineral_count = max(1, (obs_size - 9) // 3)
+    mineral_count = max(1, (obs_size - 8) // 3)
     env = LivePolicyEnv(
         run_hrs=run_hrs,
         mineral_count=mineral_count,
@@ -152,14 +159,14 @@ def main():
             step += 1
 
             action, _ = model.predict(obs, deterministic=deterministic)
-            done, delta_hrs, real_dt = env.step(int(action))
+            done, delta_hrs, real_dt = env.step(action)
             obs = env.obs()
             sent_ok = env.world.last_send_ok
 
             ts_print(
                 f"step={step} real_dt={real_dt:.3f}s sim_dt={delta_hrs:.5f}h "
                 f"pos=({env.world.rover.pos.x},{env.world.rover.pos.y}) status={env.world.rover.status.name} "
-                f"action={int(action)} sent={'ok' if sent_ok else 'failed'}"
+                f"action={action} sent={'ok' if sent_ok else 'failed'}"
             )
 
             if done or (steps > 0 and step >= steps):
