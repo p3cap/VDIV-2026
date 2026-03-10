@@ -1,4 +1,5 @@
-# ML Inputs, outputs
+# UNFINISHED
+# Machine Learning Inputs, outputs
 ## concept:
 Cutom rover env
 give rover basic info
@@ -34,6 +35,6 @@ and can order the rover to move to the given ore.
 
 ## Ouputs
 - set_gear (0,1,2)
-- goto mineral (index 1-30)
-- mine (0-1)
+- goto pos x
+- goto pos y
 

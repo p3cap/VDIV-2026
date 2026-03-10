@@ -8,7 +8,6 @@ RED = "\033[91m"
 CYAN = "\033[96m"
 RESET = "\033[0m"
 
-
 def run(cmd, cwd=None):
     try:
         subprocess.check_call(cmd, shell=True, cwd=cwd)

@@ -65,7 +65,7 @@ class Rover:
 		self.logger_url = "http://127.0.0.1:8000" # deafult localhost for development
 		self.logs_per_hr = 0.5
 
-		#mined = [] # a lit for stroring mines metrials coords, for frontend packet optimisation
+		self.mined = [] # a lit for stroring mines metrials coords, for frontend packet optimisation
 
 # ---------------- ENERGY ----------------
 	# calculates energy used for movement
@@ -117,10 +117,6 @@ class Rover:
 		return result
 
 	def astar(self, start: Vector2, goal: Vector2):
-		if isinstance(start, (tuple, list)):
-			start = Vector2(start[0], start[1])
-		if isinstance(goal, (tuple, list)):
-			goal = Vector2(goal[0], goal[1])
 		open_set = []
 		heapq.heappush(open_set, (0, start))
 
@@ -153,26 +149,13 @@ class Rover:
 		path.reverse()
 		return path, len(path)
 
-	def astar_to_any(self, start: Vector2, goals):
-		if isinstance(start, (tuple, list)):
-			start = Vector2(start[0], start[1])
-
-		goal_list = []
-		for goal in goals:
-			if isinstance(goal, (tuple, list)):
-				goal_list.append(Vector2(goal[0], goal[1]))
-			else:
-				goal_list.append(goal)
-
-		if not goal_list:
-			return None, [], float("inf")
-
-		goal_set = set(goal_list)
+	def astar_to_any(self, start: Vector2, goals:list[Vector2]): # mass path finding optimisation
+		goal_set = set(goals)
 		if start in goal_set:
 			return start, [], 0
 
 		def heuristic_to_goals(node: Vector2) -> int:
-			return min(self.heuristic(node, goal) for goal in goal_list)
+			return min(self.heuristic(node, goal) for goal in goals)
 
 		open_set = []
 		heapq.heappush(open_set, (0, start))
@@ -239,6 +222,12 @@ class Rover:
 
 		self.mine_process_hrs = self.MINING_TIME_HRS
 		self.status = STATUS.MINE
+	
+	def mine_finished(self):
+		tile_mark = self.sim.map_obj.get_tile(self.pos)
+		self.status = STATUS.IDLE
+		self.sim.map_obj.set_tile(self.pos, self.sim.map_obj.path_marker) # mark map pos as cleared
+		self.mined.append(self.pos._dict())
 		self.storage[tile_mark] += 1
 
 # ---------------- FRAME UPDATE ----------------
@@ -264,9 +253,7 @@ class Rover:
 		elif self.status == STATUS.MINE:
 			self.mine_process_hrs -= delta_hrs
 			if self.mine_process_hrs <= 0:
-				self.status = STATUS.IDLE
-				self.sim.map_obj.set_tile(self.pos, self.sim.map_obj.path_marker) # mark map pos as cleared
-		
+				self.mine_finished()
 		else:
 			self.status = STATUS.IDLE
 
@@ -286,20 +273,19 @@ class Rover:
 # ---------- Server logging --------------
 
 	def get_live_data(self, delta_hrs : float) -> dict:
-		consumed = self.energy_consumed(delta_hrs)
-		produced = self.energy_produced(delta_hrs)
 		return {
 			"time_of_day": self.sim.elapsed_hrs % (self.sim.day_hrs+self.sim.night_hrs),
 			"elapsed_hrs": self.sim.elapsed_hrs,
 			"rover_position": self.pos._dict(),
 			"rover_battery": self.battery,
 			"rover_storage": self.storage,
-			"speed": self.gear.value,
-			"status": self.status.name,
-			"distance_travelled": self.distance_travelled,
-			"path_plan": [v._dict() for v in self.path],
-			"rover_energy_consumption" : consumed,
-			"rover_energy_production" : produced,
+			"rover_speed": self.gear.value,
+			"rover_status": self.status.name,
+			"rover_distance_travelled": self.distance_travelled,
+			"rover_path_plan": [v._dict() for v in self.path],
+			"rover_energy_consumption" : self.energy_consumed(delta_hrs),
+			"rover_energy_production" : self.energy_produced(delta_hrs),
+			"rover_mined": self.mined
 		}
 
 	def get_setup_data(self) -> dict:

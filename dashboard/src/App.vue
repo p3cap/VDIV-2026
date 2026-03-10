@@ -4,8 +4,12 @@ import NavComponent from './components/NavComponent.vue';
 </script>
 
 <template>
-  <router-view />
-  <NavComponent />
+  <div class="view">
+    <router-view />
+  </div>
+  <div class="nav">
+    <NavComponent />
+  </div>
 </template>
 
 <style>
@@ -17,4 +21,5 @@ body {
   color: white;
 
 }
+
 </style>
