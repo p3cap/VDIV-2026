@@ -1,32 +1,27 @@
-from Simulation import Simulation
-from RoverClass import Rover, STATUS, GEARS
-from MapClass import Map, matrix_from_csv
+from Simulation_env import RoverSimulationWorld
+from RoverClass import STATUS, GEARS
 from Global import Vector2
-from Simulation import Simulation
 
 import time
 import os
 import sys
 import requests
 
-Sim = Simulation.__new__
-
 # -------------------------
-# DLL path beállítás ELŐBB
+# Alap beállítások
 # -------------------------
-msys_path = r"C:\msys64\ucrt64\bin"
-if os.path.exists(msys_path):
-    os.add_dll_directory(msys_path)
-
-# Ha a cpp_path.pyd nem ugyanabban a mappában van, mint a brain.py,
-# akkor ide add hozzá a tényleges mappáját
-sys.path.append(os.path.dirname(__file__))
-
-import cpp_path as cpp_mod
-
-
+BASE_URL = "http://127.0.0.1:8000"
 CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
-SERVER_URL = "http://127.0.0.1:8000"
+
+steps = 0
+delta_mode = "set_time"
+delta_hrs = 0.5
+tick_seconds = 1
+env_speed = 1.0
+send_every = 1
+run_hrs = 240.0
+
+USE_SERVER = True
 
 ORE_VALUES = {
     "Y": 1,
@@ -34,31 +29,96 @@ ORE_VALUES = {
     "B": 1,
 }
 
-
+# -------------------------
+# DLL path előbb, import utána
+# -------------------------
 msys_path = r"C:\msys64\ucrt64\bin"
 if os.path.exists(msys_path):
     os.add_dll_directory(msys_path)
 
+sys.path.append(os.path.dirname(__file__))
 
-map_obj = Map(
-    map_data=matrix_from_csv(CSV_PATH)
+import cpp_path as cpp_mod  # noqa: E402
+
+
+# -------------------------
+# World / Sim
+# -------------------------
+Sim = RoverSimulationWorld(
+    run_hrs=run_hrs,
+    delta_mode=delta_mode,
+    set_delta_hrs=delta_hrs,
+    tick_seconds=tick_seconds,
+    env_speed=env_speed,
+    web_logger=False,   # maradjon false, mi küldünk saját adatot
+    base_url=BASE_URL,
+    send_every=send_every,
 )
 
-sim = Simulation(
-    map_obj=map_obj,
-    sim_time_multiplier=20,   # FONTOS: ne legyen brutál gyors
-    run_hrs=24.0,
-    day_hrs=16.0,
-    night_hrs=8.0,
-)
-
-rover = Rover(
-    id="test_rover",
-    sim=sim
-)
+rover = Sim.rover
+sim = Sim.sim
+map_obj = Sim.sim.map_obj
 
 rover.pos = Vector2(0, 0)
 rover.gear = GEARS.NORMAL
+
+
+# -------------------------
+# Küldés a backend felé
+# -------------------------
+def send_setup():
+    if not USE_SERVER:
+        return
+
+    try:
+        requests.post(
+            f"{BASE_URL}/send_setup",
+            json={"map_matrix": map_obj.map_data},
+            timeout=2,
+        )
+    except Exception as e:
+        print("send_setup hiba:", e)
+
+
+def send_live_data(current_target=None, planned_path=None):
+    if not USE_SERVER:
+        return
+
+    try:
+        payload = {
+            "rover_position": {"x": rover.pos.x, "y": rover.pos.y},
+            "status": str(rover.status),
+            "rover_battery": rover.battery,
+            "current_target": (
+                {"x": current_target[0], "y": current_target[1]}
+                if current_target is not None else None
+            ),
+            "path_plan": (
+                [{"x": x, "y": y} for x, y in planned_path]
+                if planned_path is not None else []
+            ),
+        }
+
+        requests.post(
+            f"{BASE_URL}/send_data",
+            json=payload,
+            timeout=2,
+        )
+    except Exception as e:
+        print("send_data hiba:", e)
+
+
+# -------------------------
+# Segédfüggvények
+# -------------------------
+def refresh_refs():
+    """
+    Ha a world resetelődne, mindig az aktuális objektumokra mutassunk.
+    """
+    global rover, sim, map_obj
+    rover = Sim.rover
+    sim = Sim.sim
+    map_obj = Sim.sim.map_obj
 
 
 def get_all_ores():
@@ -103,6 +163,7 @@ def cluster_bonus(target_ore, ores, radius=6):
 
         ox, oy = ore["pos"]
         manhattan = abs(tx - ox) + abs(ty - oy)
+
         if manhattan <= radius:
             bonus += 1
 
@@ -142,11 +203,24 @@ def remove_mined_ore(ores, pos_xy):
             return True
     return False
 
+
 def same_pos_vec_and_tuple(vec, xy):
     return vec.x == xy[0] and vec.y == xy[1]
 
 
+def world_step(current_target=None, planned_path=None):
+    """
+    A világ egyetlen hivatalos léptetése.
+    """
+    refresh_refs()
+    Sim.step(sleep=True)
+    refresh_refs()
+    send_live_data(current_target=current_target, planned_path=planned_path)
 
+
+# -------------------------
+# Végrehajtás
+# -------------------------
 def move_rover_to(target_xy, planned_path):
     target_vec = Vector2(target_xy[0], target_xy[1])
     rover.path_find_to(target_vec)
@@ -156,6 +230,7 @@ def move_rover_to(target_xy, planned_path):
     last_pos = (rover.pos.x, rover.pos.y)
 
     while not same_pos_vec_and_tuple(rover.pos, target_xy):
+        world_step(current_target=target_xy, planned_path=planned_path)
 
         current_pos = (rover.pos.x, rover.pos.y)
 
@@ -190,6 +265,7 @@ def mine_current_tile(target_xy, planned_path):
     last_status = rover.status
 
     while rover.status == STATUS.MINE:
+        world_step(current_target=target_xy, planned_path=planned_path)
 
         if rover.battery <= 0:
             print("Lemerült bányászás közben.")
@@ -214,14 +290,19 @@ def mine_current_tile(target_xy, planned_path):
     return True
 
 
+# -------------------------
+# Main
+# -------------------------
 def main():
+    refresh_refs()
+
     ores = get_all_ores()
 
     print("Talált ércek száma:", len(ores))
     print("Kezdő pozíció:", rover.pos.x, rover.pos.y)
 
     send_setup()
-    send_live_data()
+    send_live_data(current_target=None, planned_path=[])
 
     mined_count = 0
 
@@ -261,17 +342,23 @@ def main():
         else:
             print("Nem sikerült törölni a kibányászott ércet:", target_xy)
 
-        # a mapon is tüntesd el, ha kell
+        # map frissítés
         x, y = target_xy
         map_obj.map_data[y][x] = "."
 
-        # frissített állapot kiküldése a bányászás után
+        # frontend is lássa a friss mapot
+        send_setup()
         send_live_data(current_target=None, planned_path=[])
 
     print("Vége.")
     print("Maradék battery:", rover.battery)
     print("Kibányászott ércek:", mined_count)
     print("Megmaradt ércek:", len(ores))
+
+    try:
+        Sim.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

@@ -54,14 +54,13 @@ finally:
       else:
           os.killpg(os.getpgid(p.pid), signal.SIGTERM) # TODO NOT TESTED
 
-<<<<<<< HEAD:setup/run_dev.py
 
 
-    print("All terminated.")
 
     print("All terminated.")
 
-
-=======
     print("All terminated.")
->>>>>>> origin/main:setup/run_dev_win.py
+
+
+
+    print("All terminated.")
