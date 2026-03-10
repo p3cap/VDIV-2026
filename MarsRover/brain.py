@@ -2,11 +2,14 @@ from Simulation import Simulation
 from RoverClass import Rover, STATUS, GEARS
 from MapClass import Map, matrix_from_csv
 from Global import Vector2
+from Simulation import Simulation
 
 import time
 import os
 import sys
 import requests
+
+Sim = Simulation.__new__
 
 # -------------------------
 # DLL path beállítás ELŐBB
@@ -139,52 +142,9 @@ def remove_mined_ore(ores, pos_xy):
             return True
     return False
 
-
-def     ():
-    try:
-        requests.post(
-            f"{SERVER_URL}/send_setup",
-            json={"map_matrix": map_obj.map_data},
-            timeout=2,
-        )
-    except Exception as e:
-        print("send_setup hiba:", e)
-
-
-def send_live_data(current_target=None, planned_path=None):
-    try:
-        data = {
-            "rover_position": {"x": rover.pos.x, "y": rover.pos.y},
-            "status": str(rover.status),
-            "rover_battery": rover.battery,
-            "current_target": (
-                {"x": current_target[0], "y": current_target[1]}
-                if current_target is not None else None
-            ),
-            "path_plan": (
-                [{"x": x, "y": y} for x, y in planned_path]
-                if planned_path is not None else []
-            ),
-        }
-
-        requests.post(
-            f"{SERVER_URL}/send_data",
-            json=data,
-            timeout=2,
-        )
-    except Exception as e:
-        print("send_data hiba:", e)
-
-
 def same_pos_vec_and_tuple(vec, xy):
     return vec.x == xy[0] and vec.y == xy[1]
 
-
-def step_sim(current_target=None, planned_path=None, dt=0.5, sleep_sec=0.15):
-    sim.update(dt)
-    rover.update(dt)
-    send_live_data(current_target=current_target, planned_path=planned_path)
-    time.sleep(sleep_sec)
 
 
 def move_rover_to(target_xy, planned_path):
@@ -196,7 +156,6 @@ def move_rover_to(target_xy, planned_path):
     last_pos = (rover.pos.x, rover.pos.y)
 
     while not same_pos_vec_and_tuple(rover.pos, target_xy):
-        step_sim(current_target=target_xy, planned_path=planned_path)
 
         current_pos = (rover.pos.x, rover.pos.y)
 
@@ -231,7 +190,6 @@ def mine_current_tile(target_xy, planned_path):
     last_status = rover.status
 
     while rover.status == STATUS.MINE:
-        step_sim(current_target=target_xy, planned_path=planned_path)
 
         if rover.battery <= 0:
             print("Lemerült bányászás közben.")
