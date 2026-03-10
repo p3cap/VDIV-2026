@@ -2,7 +2,6 @@ from Simulation_env import RoverSimulationWorld
 from RoverClass import STATUS, GEARS
 from Global import Vector2
 
-import time
 import os
 import sys
 import requests
@@ -16,7 +15,7 @@ CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
 steps = 0
 delta_mode = "set_time"
 delta_hrs = 0.5
-tick_seconds = 1
+tick_seconds = 1   # 1 helyett kisebb, hogy ne legyen túl lassú
 env_speed = 1.0
 send_every = 1
 run_hrs = 240.0
@@ -40,7 +39,6 @@ sys.path.append(os.path.dirname(__file__))
 
 import cpp_path as cpp_mod  # noqa: E402
 
-
 # -------------------------
 # World / Sim
 # -------------------------
@@ -50,7 +48,7 @@ Sim = RoverSimulationWorld(
     set_delta_hrs=delta_hrs,
     tick_seconds=tick_seconds,
     env_speed=env_speed,
-    web_logger=False,   # maradjon false, mi küldünk saját adatot
+    web_logger=False,
     base_url=BASE_URL,
     send_every=send_every,
 )
@@ -112,9 +110,6 @@ def send_live_data(current_target=None, planned_path=None):
 # Segédfüggvények
 # -------------------------
 def refresh_refs():
-    """
-    Ha a world resetelődne, mindig az aktuális objektumokra mutassunk.
-    """
     global rover, sim, map_obj
     rover = Sim.rover
     sim = Sim.sim
@@ -209,9 +204,6 @@ def same_pos_vec_and_tuple(vec, xy):
 
 
 def world_step(current_target=None, planned_path=None):
-    """
-    A világ egyetlen hivatalos léptetése.
-    """
     refresh_refs()
     Sim.step(sleep=True)
     refresh_refs()
@@ -307,6 +299,7 @@ def main():
     mined_count = 0
 
     while rover.battery > 0 and ores:
+        # JAVÍTVA: (x, y) kell, nem (y, x)
         current_pos = (rover.pos.x, rover.pos.y)
 
         best = choose_next_ore(current_pos, ores)
@@ -324,7 +317,6 @@ def main():
             f"dist: {best['dist']}"
         )
 
-        # egyszer elküldjük az új célt
         send_live_data(current_target=target_xy, planned_path=planned_path)
 
         ok_move = move_rover_to(target_xy, planned_path)
@@ -342,11 +334,9 @@ def main():
         else:
             print("Nem sikerült törölni a kibányászott ércet:", target_xy)
 
-        # map frissítés
         x, y = target_xy
         map_obj.map_data[y][x] = "."
 
-        # frontend is lássa a friss mapot
         send_setup()
         send_live_data(current_target=None, planned_path=[])
 
