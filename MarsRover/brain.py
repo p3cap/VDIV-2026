@@ -2,9 +2,12 @@ from Simulation_env import RoverSimulationWorld
 from RoverClass import STATUS, GEARS
 from Global import Vector2
 
-import os
-import sys
+
 import requests
+import cpp_path as cpp_mod
+
+
+
 
 # -------------------------
 # Alap beállítások
@@ -27,15 +30,6 @@ ORE_VALUES = {
     "G": 1,
     "B": 1,
 }
-
-# -------------------------
-# DLL path előbb, import utána
-# -------------------------
-msys_path = r"C:\msys64\ucrt64\bin"
-if os.path.exists(msys_path):
-    os.add_dll_directory(msys_path)
-
-sys.path.append(os.path.dirname(__file__))
 
 import cpp_path as cpp_mod  # noqa: E402
 
@@ -87,10 +81,6 @@ def send_live_data(current_target=None, planned_path=None):
             "rover_position": {"x": rover.pos.x, "y": rover.pos.y},
             "status": str(rover.status),
             "rover_battery": rover.battery,
-            "current_target": (
-                {"x": current_target[0], "y": current_target[1]}
-                if current_target is not None else None
-            ),
             "path_plan": (
                 [{"x": x, "y": y} for x, y in planned_path]
                 if planned_path is not None else []

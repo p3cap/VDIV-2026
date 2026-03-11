@@ -1,6 +1,5 @@
-<<<<<<< HEAD
-<template></template>
-=======
+
+
 <template>
   <div class="dashboard">
     <div class="bg-grid" />
@@ -655,4 +654,4 @@ watch(() => store.mined,     drawScatter, { deep: true })
   }
 }
 </style>
->>>>>>> origin/main
+
