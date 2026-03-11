@@ -25,11 +25,13 @@
 
 ### Installation
 
-**For All OS:**
-Install dependencies:
-`python setup\setup_deps.py`
-Run server:
-`python setup\run_dev.py`
+***macOS / linux:*** \
+Install dependencies: `python3 setup_deps.py`\
+Run server: `python3 run_dev_win.py`
+
+***Windows:*** \
+Install dependencies: `python setup_deps.py` \
+Run server: `python run_dev_win.py`
 
 - [Join the Trello to-do board](https://trello.com/invite/b/6996c72600fdca68f9db5350/ATTIad8a225216767fe5ccef09a8f2a9e499B1965B1C/vdiv-2026)
 - [Join the Figma Design plan board](https://www.figma.com/design/kszosmFP5rPWRPXjKashwm/Untitled?node-id=0-1&m=dev&t=HY3IaC9Xtn6jKFqw-1)

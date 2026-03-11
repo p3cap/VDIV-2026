@@ -6,5 +6,4 @@
              -->
     </div>
 </template>
-<style lang="css" scoped>
-</style>
+<style src="../main.css"></style>

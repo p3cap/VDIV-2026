@@ -277,15 +277,4 @@ watch(() => props.mined, (mined) => {
 }, { deep: true })
 </script>
 
-<style scoped>
-.map-wrapper {
-  width: 100%;
-  height: 100%;
-  background: #0a0e1a;
-  overflow: hidden;
-}
-.pixi-container {
-  width: 100%;
-  height: 100%;
-}
-</style>
+<style src="../main.css"></style>

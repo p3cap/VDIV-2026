@@ -741,38 +741,4 @@ watch(() => props.roverStatus,   () => updateStatusLight());
   </div>
 </template>
 
-<style scoped>
-.canvas-wrap {
-  width: 100%;
-  height: 100%;
-  display: block;
-  position: relative;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-/* Show pan cursor by default; grabbing when left-drag active */
-.canvas-wrap { cursor: default; }
-.canvas-wrap:active { cursor: grabbing; }
-
-.hint {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-}
-.hint span {
-  background: rgba(0,0,0,0.55);
-  color: rgba(255,255,255,0.75);
-  font-size: 11px;
-  font-family: monospace;
-  padding: 3px 10px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-</style>
+<style src="../main.css"></style>

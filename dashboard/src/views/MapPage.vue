@@ -36,17 +36,4 @@ export default {
   </div>
 </template>
 
-<style scoped>
-.loader {
-  text-align: center;
-  padding: 50px;
-}
-.map-container {
-  display: flex;
-  flex-direction: row;
-  width: 100vw;
-  height: 100vh;
-  align-items: center;
-  justify-content: center;
-}
-</style>
+<style src="../main.css"></style>

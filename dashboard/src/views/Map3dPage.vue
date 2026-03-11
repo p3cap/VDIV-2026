@@ -59,7 +59,7 @@ const markers    = computed(() => setup.value.markers     ?? {});
 </script>
 
 <template>
-  <div class="page">
+  <div class="map3d-page">
 
     <template v-if="ready">
       <!--
@@ -125,54 +125,4 @@ const markers    = computed(() => setup.value.markers     ?? {});
   </div>
 </template>
 
-<style scoped>
-.page {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background: #000;
-}
-
-/* Instruments panel — bottom-right, above vignette, pointer-events off */
-.instruments-anchor {
-  position: absolute;
-  bottom: 20px;
-  right: 60px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* Loading screen */
-.loader {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  background: #07080c;
-  color: #44566a;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 0.85rem;
-  letter-spacing: 0.15em;
-}
-
-.loader-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff6b35;
-  animation: dotPulse 1.2s ease-in-out infinite;
-}
-.loader-dot:nth-child(1) { animation-delay: 0s; }
-.loader-dot:nth-child(2) { animation-delay: 0.2s; }
-.loader-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes dotPulse {
-  0%, 80%, 100% { opacity: 0.15; transform: scale(0.8); }
-  40%           { opacity: 1;    transform: scale(1.2); }
-}
-</style>
+<style src="../main.css"></style>

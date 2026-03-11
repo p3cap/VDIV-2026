@@ -20,22 +20,14 @@ procs = []
 
 
 # -------------------------------------------------
-# Terminal Launcher (Cross-Platform)
+# Terminal Launcher (macOS / Linux)
 # -------------------------------------------------
 def open_terminal(command: str, cwd: Path):
     cwd = str(cwd)
     cwd_q = shlex.quote(cwd)
     cmd_q = command.replace('"', '\\"')
 
-    if OS_NAME == "Windows":
-        # Opens new cmd window and keeps it open
-        full_cmd = f'cd /d "{cwd}" && {command}'
-        return subprocess.Popen(
-            ["cmd", "/c", "start", "cmd", "/k", full_cmd],
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-
-    elif OS_NAME == "Darwin":
+    if OS_NAME == "Darwin":
         # macOS Terminal using login shell (loads env, npm, python paths)
         osa_script = f'''
         tell application "Terminal"
@@ -62,19 +54,11 @@ def open_terminal(command: str, cwd: Path):
 def cleanup():
     print("\nStopping all processes...")
 
-    if OS_NAME == "Windows":
-        for p in procs:
-            try:
-                p.send_signal(signal.CTRL_BREAK_EVENT)
-            except Exception:
-                pass
-
-    else:
-        for p in procs:
-            try:
-                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-            except Exception:
-                pass
+    for p in procs:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+        except Exception:
+            pass
 
     print("All terminated.")
 

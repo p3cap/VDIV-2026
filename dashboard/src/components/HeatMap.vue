@@ -105,10 +105,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped>
-.heatmap {
-  width: 500px;
-  height: 600px;
-
-}
-</style>
+<style src="../main.css"></style>

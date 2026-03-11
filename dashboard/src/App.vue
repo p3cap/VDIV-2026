@@ -18,31 +18,4 @@ import NavbarPhoneComponent from './components/NavbarPhoneComponent.vue';
   </div>
 </template>
 
-<style>
-body {
-  margin: 0;
-  font-family: system-ui, Arial, sans-serif;
-  background: black;
-  color: white;
-}
-
-/* Hide mobile nav on larger screens */
-.mobile-navbar {
-  display: none;
-}
-
-/* Hide desktop nav on small screens */
-.desktop-navbar {
-  display: block;
-}
-
-/* Media query for phones (max-width 768px) */
-@media (max-width: 576px) {
-  .mobile-navbar {
-    display: block;
-  }
-  .desktop-navbar {
-    display: none;
-  }
-}
-</style>
+<style src="./main.css"></style>

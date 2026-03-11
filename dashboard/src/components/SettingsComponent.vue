@@ -12,4 +12,4 @@
                 
     -->
 </template>
-<style scoped></style>
+<style src="../main.css"></style>
