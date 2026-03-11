@@ -1,0 +1,11 @@
+Visuál studiot installert indítsd el, majd modify ,ott keresd meg a desktop development with C++ és instaláld. 
+majd a ott ahol használni akarod a C++ oda rakd ezt -- import requests,import cpp_path as cpp_mod
+
+cpp_mod.astar_from_csv(CSV_PATH, start_xy, goal_xy) -- ezzel tudod használni az A*-t 
+
+ha nem akarja az igazságot a setup_devs után akkor futasd ezt :   
+cd D:\programozas\VadaszDenes\MarsRover - python -m pip uninstall -y cpp_path
+-python -m pip install .
+-python -c "import cpp_path; print(cpp_path.__file__)"
+
+ha erre hibát dob szolj.

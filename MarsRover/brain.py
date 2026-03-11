@@ -31,8 +31,6 @@ ORE_VALUES = {
     "B": 1,
 }
 
-import cpp_path as cpp_mod  # noqa: E402
-
 # -------------------------
 # World / Sim
 # -------------------------
