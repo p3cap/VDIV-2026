@@ -30,14 +30,15 @@ A vizualizáció Vite + Vue 3 alapú , amely valós idejű adatokat jelenít meg
 - `ChartComponent.vue`: ECharts wrapper (opciós, több helyen használható).
 - `HeatMap.vue`: ECharts heatmap, map mátrix 
 vizualizáció.
-- `SettingsComponent.vue`: Beállítások folytatni kell !!!!.
+- `SettingsComponent.vue`: Beállítások folytatni kell.
+
 ## Használt libraryk (a kódban ténylegesen)
 - `vue` – UI framework
 - `vue-router` – oldal-navigáció
 - `pinia` – state management
 - `pixi.js`, `pixi-viewport` – 2D térkép renderelés
 - `three` – 3D térkép renderelés
-- `uplot` – teljesítménybarát vonaldiagramok
+- `uplot` – dinamikus chartok
 - `echarts` – heatmap / általános chartok
 - `animejs` – animációk
 - `lucide-vue-next` – ikonok

@@ -37,7 +37,7 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 - `pinia` – state management
 - `pixi.js`, `pixi-viewport` – 2D map rendering
 - `three` – 3D map rendering
-- `uplot` – performance-friendly line charts
+- `uplot` – performance-friendly, dynamic charts
 - `echarts` – heatmaps / general charts
 - `animejs` – animations
 - `lucide-vue-next` – icons
