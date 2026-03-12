@@ -54,4 +54,13 @@ finally:
       else:
           os.killpg(os.getpgid(p.pid), signal.SIGTERM) # TODO NOT TESTED
 
+
+
+
+    print("All terminated.")
+
+    print("All terminated.")
+
+
+
     print("All terminated.")

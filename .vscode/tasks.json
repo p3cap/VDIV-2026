@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Final Build MarsRover 3.13",
+            "type": "shell",
+            "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
+            "args": [
+                "-O3",
+                "-shared",
+                "-std=c++17",
+                "-DMS_WIN64",
+                "-ID:/programozas/VadaszDenes/.venv/Lib/site-packages/pybind11/include",
+                "-IC:/Users/toron/AppData/Local/Programs/Python/Python313/include",
+                "${workspaceFolder}\\MarsRover\\C++_path\\path.cpp",
+                "-o",
+                "${workspaceFolder}\\MarsRover\\C++_path\\cpp_path.pyd",
+                "-LC:/Users/toron/AppData/Local/Programs/Python/Python313/libs",
+                "-lpython313"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

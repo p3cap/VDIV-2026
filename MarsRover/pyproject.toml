@@ -1,0 +1,18 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.10",
+  "pybind11>=2.12"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cpp_path"
+version = "0.1.0"
+description = "C++ A* pathfinding module for MarsRover"
+requires-python = ">=3.11"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build.verbose = true
+cmake.build-type = "Release"
+wheel.packages = []
