@@ -1,9 +1,6 @@
 import sys, subprocess, platform, webbrowser
 from pathlib import Path
-import questionary
 import os
-import signal
-import time
 
 root = Path(__file__).resolve().parent.parent
 mars = root / "MarsRover"
@@ -27,19 +24,23 @@ def new_terminal(cmd, cwd):
     return p
 
 
-# --- Choose mode ---
-mode = questionary.select("Select mode:", choices=["test", "ai", "none"]).ask()
-if mode == "test":
-    procs.append(new_terminal(f"{sys.executable} main.py", mars))
-elif mode == "ai":
-    procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py", mars))
-
 # --- Start Server ---
 procs.append(new_terminal(f"{sys.executable} Server/Server.py", root))
 
 # --- Dashboard ---
 procs.append(new_terminal("npm run dev", dash))
 webbrowser.open("http://localhost:5173/")
+
+
+# --- Choose mode ---
+mode = input("Select rover algorythm [test, ai, brain, none]")
+if mode == "test":
+    procs.append(new_terminal(f"{sys.executable} main.py", mars))
+elif mode == "ai":
+    procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py --debug-nn", mars))
+elif mode == "brain":
+    procs.append(new_terminal(f"{sys.executable} brain.py", mars))
+
 
 # --- Wait until user stops ---
 print("\nPress ENTER to stop all processes...")
@@ -49,18 +50,6 @@ finally:
     print("Stopping all terminals...")
     # Kill child processes
     for p in procs:
-      if osys == "Windows":
-          p.terminate()
-      else:
-          os.killpg(os.getpgid(p.pid), signal.SIGTERM) # TODO NOT TESTED
-
-
-
-
-    print("All terminated.")
-
-    print("All terminated.")
-
-
+        p.terminate()
 
     print("All terminated.")

@@ -335,9 +335,10 @@ def main():
         for i, m in enumerate(models, 1):
             print(f"  {i}. {m.stem}")
 
-    model_name = input("\nModel name [rover_ppo_simple]: ").strip() or "rover_ppo_simple"
+    model_name = input("\nModel name [rover_ppo_simple]: ").strip() or "unnamed"
+    timestamps =  input("\nTimestaps [100_000]: ").strip().replace(" ","") or 100_000
     train_model(
-        timesteps=10_000,
+        timesteps=int(timestamps),
         out_path=str(trained_dir / model_name),
     )
 

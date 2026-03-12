@@ -45,7 +45,11 @@ class RoverSimulationWorld:
             night_hrs=8.0,
             sim_time_multiplier=1.0,
         )
-        self.rover = Rover(id="ppo_rover", sim=self.sim)
+        self.rover = Rover(
+            id="ppo_rover",
+            sim=self.sim,
+            map_csv_path=str(self.map_path),
+        )
         self._step_count = 0
         self.last_send_ok = None
         if self.websocket_logger is not None:
