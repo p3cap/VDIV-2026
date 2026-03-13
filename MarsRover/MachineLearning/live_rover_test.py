@@ -11,18 +11,20 @@ MARS_ROVER_ROOT = Path(__file__).parent.parent
 sys.path.append(str(MARS_ROVER_ROOT))
 
 from Global import Vector2
-from RoverClass import GEARS, STATUS
+from RoverClass import STATUS
 from Simulation_env import RoverSimulationWorld
+from ppo_shared import (
+    OBS_STATIC_FIELDS,
+    PER_MINERAL_FIELDS,
+    USE_MINERAL_DISTANCE,
+    build_obs,
+    compute_reward,
+    obs_size,
+    rank_minerals,
+    snap_gear,
+)
 
 ML_ROOT = Path(__file__).parent
-GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}
-FLOAT_TO_GEAR = {0.0: GEARS.SLOW, 0.5: GEARS.NORMAL, 1.0: GEARS.FAST}
-
-
-def snap_gear(value: float) -> GEARS:
-    snapped = min([0.0, 0.5, 1.0], key=lambda g: abs(g - float(value)))
-    return FLOAT_TO_GEAR[snapped]
-
 
 def ts_print(message: str):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
@@ -35,6 +37,7 @@ class LivePolicyEnv:
         self.mineral_count = mineral_count
         self.prev_mined = None
         self.total_mined = 0
+        self._no_move_streak = 0
         self.world = RoverSimulationWorld(
             run_hrs=run_hrs,
             delta_mode=delta_mode,
@@ -45,47 +48,21 @@ class LivePolicyEnv:
             base_url=base_url,
             send_every=send_every,
         )
-        self.obs_size = 8 + (self.mineral_count * 3) # input size
+        self.obs_size = obs_size(self.mineral_count)  # input size
+        self._obs_buf = np.zeros(self.obs_size, dtype=np.float32)
 
     def _ranked_minerals(self): # get mineral distances
-        rover = self.world.rover
-        minerals = list(self.world.minerals())
-        if not minerals:
-            return []
-        rx, ry = rover.pos.x, rover.pos.y
-        ranked = sorted(minerals, key=lambda m: abs(m.x - rx) + abs(m.y - ry))
-        return [(m, float(abs(m.x - rx) + abs(m.y - ry))) for m in ranked[:self.mineral_count]]
+        return rank_minerals(self.world, self.mineral_count)
 
     def obs(self): # NN Inputs
-        rover = self.world.rover
-        sim = self.world.sim
-        obs = np.zeros(self.obs_size, dtype=np.float32)
-        cycle = sim.day_hrs + sim.night_hrs
-        inv_w = self.world.inv_w
-        inv_h = self.world.inv_h
-
-        obs[0] = rover.battery / rover.MAX_BATTERY_CHARGE
-        obs[1] = GEAR_TO_FLOAT[rover.gear]
-        obs[2] = min(1.0, self.world.run_hrs / 240.0)
-        obs[3] = (sim.elapsed_hrs % cycle) / cycle
-        obs[4] = rover.pos.x * inv_w
-        obs[5] = rover.pos.y * inv_h
-        px = self.prev_mined.x if self.prev_mined is not None else 0
-        py = self.prev_mined.y if self.prev_mined is not None else 0
-        obs[6] = px * inv_w
-        obs[7] = py * inv_h
-
         ranked = self._ranked_minerals()
-        max_d = float(self.world.map_width + self.world.map_height)
-        for i in range(self.mineral_count):
-            base = 8 + i * 3
-            if i >= len(ranked):
-                break
-            pos, dist = ranked[i]
-            obs[base] = min(1.0, dist / max_d)
-            obs[base + 1] = pos.x * inv_w
-            obs[base + 2] = pos.y * inv_h
-        return obs
+        return build_obs(
+            world=self.world,
+            mineral_count=self.mineral_count,
+            prev_mined=self.prev_mined,
+            mineral_cache=ranked,
+            obs_buf=self._obs_buf,
+        )
 
     def step(self, action: np.ndarray) -> tuple[bool, float, float]:
         rover = self.world.rover
@@ -116,6 +93,17 @@ class LivePolicyEnv:
 
         done = (rover.status == STATUS.DEAD) or (len(self.world.minerals()) == 0) or (not sim.is_running)
         return done, delta_hrs, real_dt_seconds
+
+    def reward(self, mined_now: int, dist_gain: float, battery_cost: float, minerals_left: int, is_dead: bool) -> float:
+        reward, self._no_move_streak = compute_reward(
+            mined_now=mined_now,
+            dist_gain=dist_gain,
+            battery_cost=battery_cost,
+            minerals_left=minerals_left,
+            is_dead=is_dead,
+            no_move_streak=self._no_move_streak,
+        )
+        return reward
 
 
 def choose_model_base(requested: Optional[str]) -> str:
@@ -160,9 +148,12 @@ def infer_mineral_count(model) -> int:
     if len(obs_shape.shape) != 1:
         raise ValueError(f"Unexpected obs shape {obs_shape.shape}; expected 1-D.")
     obs_size = int(obs_shape.shape[0])
-    if (obs_size - 8) % 3 != 0:
-        raise ValueError(f"Observation size {obs_size} is not 8 + 3*k; cannot infer mineral count.")
-    mineral_count = max(1, (obs_size - 8) // 3)
+    if (obs_size - OBS_STATIC_FIELDS) % PER_MINERAL_FIELDS != 0:
+        raise ValueError(
+            f"Observation size {obs_size} is not {OBS_STATIC_FIELDS} + "
+            f"{PER_MINERAL_FIELDS}*k; cannot infer mineral count (distance flag={USE_MINERAL_DISTANCE})."
+        )
+    mineral_count = max(1, (obs_size - OBS_STATIC_FIELDS) // PER_MINERAL_FIELDS)
 
     act_shape = getattr(getattr(model, "action_space", None), "shape", None)
     if act_shape != (3,):
@@ -205,8 +196,6 @@ def main():
     obs = env.obs()
     step = 0
 
-    no_move_streak = 0
-
     try:
         while True:
             step += 1
@@ -231,17 +220,7 @@ def main():
             minerals_left = after_minerals
             is_dead = env.world.rover.status == STATUS.DEAD
 
-            reward = mined_now * 20.0 + dist_gain * 0.1 - battery_cost * 0.02 - 0.05
-            if dist_gain <= 0 and mined_now <= 0:
-                no_move_streak += 1
-                penalty = min(8.0, 2.0 + 0.5 * no_move_streak)
-                reward -= penalty
-            else:
-                no_move_streak = 0
-            if is_dead:
-                reward -= 200.0
-            if minerals_left == 0:
-                reward += 50.0
+            reward = env.reward(mined_now, dist_gain, battery_cost, minerals_left, is_dead)
 
             ts_print(
                 f"step={step} real_dt={real_dt:.3f}s sim_dt={delta_hrs:.5f}h "

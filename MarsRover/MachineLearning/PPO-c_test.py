@@ -3,7 +3,7 @@ PPO-based ML training for a Mars Rover environment.
 Observation (17 inputs):
   battery, gear, run_hrs, time_of_day, rover_x, rover_y,
   prev_mined_x, prev_mined_y,
-  [dist, x, y] × N_MINERALS closest minerals
+  [dist, x, y] × MINERAL_COUNT closest minerals (default: 3)
 Action (continuous Box, 3 outputs):
   [0] gear   → snapped to {SLOW=0, NORMAL=0.5, FAST=1}
   [1] goto_x → normalised 0-1
@@ -15,6 +15,9 @@ import sys
 import time
 from pathlib import Path
 
+MARS_ROVER_ROOT = Path(__file__).parent.parent
+sys.path.append(str(MARS_ROVER_ROOT))
+
 import gymnasium as gym
 import numpy as np
 import torch
@@ -22,22 +25,19 @@ from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-
-MARS_ROVER_ROOT = Path(__file__).parent.parent
-sys.path.append(str(MARS_ROVER_ROOT))
-
 from Global import Vector2
-from RoverClass import GEARS, STATUS
+from RoverClass import STATUS
 from Simulation_env import RoverSimulationWorld
-
-GEAR_TO_FLOAT = {GEARS.SLOW: 0.0, GEARS.NORMAL: 0.5, GEARS.FAST: 1.0}
-FLOAT_TO_GEAR = {0.0: GEARS.SLOW, 0.5: GEARS.NORMAL, 1.0: GEARS.FAST}
-N_MINERALS = 3  # closest minerals exposed to the agent
-
-
-def snap_gear(value: float) -> GEARS:
-    snapped = min([0.0, 0.5, 1.0], key=lambda g: abs(g - float(value)))
-    return FLOAT_TO_GEAR[snapped]
+from ppo_shared import (
+    DEFAULT_MINERAL_COUNT,
+    PER_MINERAL_FIELDS,
+    USE_MINERAL_DISTANCE,
+    build_obs,
+    compute_reward,
+    obs_size,
+    rank_minerals,
+    snap_gear,
+)
 
 
 # ─────────────────────────── Callback ────────────────────────────
@@ -97,12 +97,14 @@ class RoverEnv(gym.Env):
     NO_MOVE_PENALTY_BASE   = 2.0
     NO_MOVE_PENALTY_STREAK = 0.5
     NO_MOVE_PENALTY_CAP    = 8.0
+    MINERAL_COUNT          = DEFAULT_MINERAL_COUNT
 
-    # obs: [battery, gear, run_hrs, tod, rx, ry, pmx, pmy] + N_MINERALS×[dist,x,y]
-    OBS_SIZE = 8 + N_MINERALS * 3
+    # obs: [battery, gear, run_hrs, tod, rx, ry, pmx, pmy] + MINERAL_COUNT×[dist,x,y]
+    OBS_SIZE = obs_size(MINERAL_COUNT)
 
     def __init__(self, run_hrs: float = 24.0, delta_hrs: float = 0.5):
         super().__init__()
+        self.mineral_count = self.MINERAL_COUNT
         self.run_hrs   = run_hrs
         self.delta_hrs = delta_hrs
 
@@ -132,59 +134,36 @@ class RoverEnv(gym.Env):
 
     def _rebuild_mineral_cache(self):
         """Manhattan-distance ranking — fast, no A* per step."""
-        rover    = self.world.rover
-        minerals = list(self.world.minerals())
-        if not minerals:
-            self._mineral_cache  = []
-            self._minerals_dirty = False
-            return
-        rx, ry = rover.pos.x, rover.pos.y
-        ranked = sorted(minerals, key=lambda m: abs(m.x - rx) + abs(m.y - ry))
-        self._mineral_cache  = [(m, float(abs(m.x - rx) + abs(m.y - ry)))
-                                for m in ranked[:N_MINERALS]]
+        self._mineral_cache  = rank_minerals(self.world, self.mineral_count)
         self._minerals_dirty = False
 
     # ── observation ───────────────────────────────────────────────
 
     def _obs(self) -> np.ndarray:
-        rover  = self.world.rover
-        sim    = self.world.sim
-        iw, ih = self.world.inv_w, self.world.inv_h
-        obs    = self._obs_buf
-        obs.fill(0.0)
-
-        obs[0] = rover.battery / rover.MAX_BATTERY_CHARGE
-        obs[1] = GEAR_TO_FLOAT[rover.gear]
-        obs[2] = min(1.0, self.run_hrs / 240.0)
-        obs[3] = (sim.elapsed_hrs % self._cycle_hrs) / self._cycle_hrs
-        obs[4] = rover.pos.x * iw
-        obs[5] = rover.pos.y * ih
-        obs[6] = self._prev_mined.x * iw
-        obs[7] = self._prev_mined.y * ih
-
-        max_d = float(self.map_w + self.map_h)
-        for i, (pos, dist) in enumerate(self._mineral_cache):
-            b = 8 + i * 3
-            obs[b]     = min(1.0, dist / max_d)
-            obs[b + 1] = pos.x * iw
-            obs[b + 2] = pos.y * ih
-
-        return obs.copy()
+        return build_obs(
+            world=self.world,
+            mineral_count=self.mineral_count,
+            prev_mined=self._prev_mined,
+            mineral_cache=self._mineral_cache,
+            obs_buf=self._obs_buf,
+        )
 
     # ── reward ────────────────────────────────────────────────────
 
     def _reward(self, mined_now: int, dist_gain: float,
                 battery_cost: float, minerals_left: int, is_dead: bool) -> float:
-        r = mined_now * 20.0 + dist_gain * 0.1 - battery_cost * 0.02 - 0.05
-        if dist_gain <= 0 and mined_now <= 0:
-            self._no_move_streak += 1
-            r -= min(self.NO_MOVE_PENALTY_CAP,
-                     self.NO_MOVE_PENALTY_BASE + self.NO_MOVE_PENALTY_STREAK * self._no_move_streak)
-        else:
-            self._no_move_streak = 0
-        if is_dead:            r -= 200.0
-        if minerals_left == 0: r += 50.0
-        return r
+        reward, self._no_move_streak = compute_reward(
+            mined_now=mined_now,
+            dist_gain=dist_gain,
+            battery_cost=battery_cost,
+            minerals_left=minerals_left,
+            is_dead=is_dead,
+            no_move_streak=self._no_move_streak,
+            penalty_base=self.NO_MOVE_PENALTY_BASE,
+            penalty_streak=self.NO_MOVE_PENALTY_STREAK,
+            penalty_cap=self.NO_MOVE_PENALTY_CAP,
+        )
+        return reward
 
     # ── gym API ───────────────────────────────────────────────────
 
@@ -318,6 +297,16 @@ def train_model(timesteps: int, out_path: str, device: str = "auto",
     )
 
     model.save(str(base_path))
+    settings_path = base_path.with_suffix(".txt")
+    settings_path.write_text(
+        "\n".join([
+            f"mineral_count={RoverEnv.MINERAL_COUNT}",
+            f"use_mineral_distance={USE_MINERAL_DISTANCE}",
+            f"per_mineral_fields={PER_MINERAL_FIELDS}",
+            f"obs_size={obs_size(RoverEnv.MINERAL_COUNT)}",
+        ]),
+        encoding="utf-8",
+    )
     (base_path.parent / "latest_ppo_model.txt").write_text(base_path.name, encoding="utf-8")
     vec_env.close()
     print(f"[PPO] Finished in {time.perf_counter()-t0:.1f}s  →  {base_path}.zip", flush=True)
