@@ -1,0 +1,680 @@
+/* ═══════════════════════════════════════════════
+   WELCOME.CSS — WelcomePage + Info Cards + Modal
+   Deep Space Noir Design System
+   ═══════════════════════════════════════════════ */
+
+/* ────────────────────────────────
+   Page wrapper
+   ──────────────────────────────── */
+.welcome {
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-5);
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(0, 255, 200, 0.055) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(255, 107, 53, 0.045) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 40%, rgba(0, 153, 255, 0.03) 0%, transparent 50%),
+    var(--clr-void);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background grid */
+.welcome::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Travelling scan line */
+.welcome::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 200px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 255, 200, 0.018) 50%, transparent);
+  animation: scanline 12s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.welcome > * { position: relative; z-index: 1; }
+
+/* ────────────────────────────────
+   Hero block
+   ──────────────────────────────── */
+.welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  text-align: center;
+  max-width: 720px;
+}
+
+.welcome .welcome-eyebrow {
+  font-family: var(--font-tele);
+  font-size: 0.72rem;
+  letter-spacing: 0.36em;
+  color: var(--accent);
+  text-transform: uppercase;
+  opacity: 0;
+}
+
+.welcome .welcome-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 6vw, 4.8rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--txt-bright);
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 0;
+  text-shadow:
+    0 0 50px rgba(0, 255, 200, 0.15),
+    0 0 100px rgba(0, 255, 200, 0.05);
+  opacity: 0;
+}
+
+.welcome .welcome-title em {
+  color: var(--accent);
+  font-style: normal;
+  text-shadow: var(--accent-glow);
+}
+
+.welcome .welcome-sub {
+  font-family: var(--font-mono);
+  font-size: clamp(0.78rem, 1.6vw, 1rem);
+  letter-spacing: 0.06em;
+  color: var(--txt-secondary);
+  line-height: 1.7;
+  max-width: 520px;
+  margin: 0;
+  opacity: 0;
+}
+
+/* ────────────────────────────────
+   Cards grid
+   ──────────────────────────────── */
+.welcome-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-5);
+  width: 100%;
+  max-width: 1080px;
+}
+
+/* ── Single card ── */
+.wcard {
+  position: relative;
+  padding: var(--sp-6) var(--sp-6) var(--sp-5);
+  background: rgba(255, 255, 255, 0.024);
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  overflow: hidden;
+  opacity: 0;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.3s ease,
+    background 0.3s ease;
+}
+
+/* Corner accent brackets */
+.wcard::before {
+  content: '';
+  position: absolute;
+  top: 10px; left: 10px;
+  width: 16px; height: 16px;
+  border-top: 2px solid var(--card-accent, var(--accent));
+  border-left: 2px solid var(--card-accent, var(--accent));
+  border-radius: 2px 0 0 0;
+  opacity: 0.45;
+  transition: opacity 0.3s, width 0.3s, height 0.3s;
+}
+
+.wcard::after {
+  content: '';
+  position: absolute;
+  bottom: 10px; right: 10px;
+  width: 16px; height: 16px;
+  border-bottom: 2px solid var(--card-accent, var(--accent));
+  border-right: 2px solid var(--card-accent, var(--accent));
+  border-radius: 0 0 2px 0;
+  opacity: 0.45;
+  transition: opacity 0.3s, width 0.3s, height 0.3s;
+}
+
+.wcard:hover {
+  border-color: var(--card-accent, var(--accent));
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-5px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--card-accent, var(--accent)),
+    0 0 40px color-mix(in srgb, var(--card-accent, var(--accent)) 12%, transparent);
+}
+
+.wcard:hover::before,
+.wcard:hover::after {
+  opacity: 1;
+  width: 24px; height: 24px;
+}
+
+.wcard:active { transform: translateY(-2px); }
+
+/* Colour variants */
+.wcard--cyan   { --card-accent: var(--accent); }
+.wcard--orange { --card-accent: var(--orange); }
+.wcard--green  { --card-accent: var(--clr-ok); }
+
+/* Card icon */
+.wcard__icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--card-accent, var(--accent)) 10%, transparent);
+  color: var(--card-accent, var(--accent));
+  flex-shrink: 0;
+}
+
+.wcard__icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  filter: drop-shadow(0 0 6px var(--card-accent, var(--accent)));
+}
+
+/* Card label */
+.wcard__label {
+  font-family: var(--font-tele);
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--card-accent, var(--accent));
+  margin-bottom: var(--sp-2);
+}
+
+/* Card title */
+.wcard__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--txt-bright);
+  letter-spacing: 0.06em;
+  margin: 0 0 var(--sp-3);
+}
+
+/* Card blurb */
+.wcard__blurb {
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  line-height: 1.65;
+  color: var(--txt-muted);
+  margin: 0;
+}
+
+/* Hover prompt */
+.wcard__arrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  font-family: var(--font-tele);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-accent, var(--accent));
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.22s, transform 0.22s;
+}
+
+.wcard:hover .wcard__arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ────────────────────────────────
+   Modal / expanded panel
+   ──────────────────────────────── */
+.wmodal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 15, 0.86);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.wmodal {
+  width: 100%;
+  max-width: 780px;
+  max-height: 88vh;
+  background: linear-gradient(145deg, rgba(15, 26, 46, 0.99), rgba(7, 12, 24, 1));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 2px solid var(--modal-accent, var(--accent));
+  border-radius: var(--r-lg);
+  box-shadow:
+    var(--shadow-float),
+    0 0 80px rgba(0, 0, 0, 0.7),
+    0 0 40px color-mix(in srgb, var(--modal-accent, var(--accent)) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(28px) scale(0.97);
+}
+
+/* Modal header */
+.wmodal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-5) var(--sp-6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  gap: var(--sp-4);
+}
+
+.wmodal__head-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.wmodal__icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--modal-accent, var(--accent)) 10%, transparent);
+  color: var(--modal-accent, var(--accent));
+  flex-shrink: 0;
+}
+
+.wmodal__icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  filter: drop-shadow(0 0 6px var(--modal-accent, var(--accent)));
+}
+
+.wmodal__titles { display: flex; flex-direction: column; gap: 3px; }
+
+.wmodal__label {
+  font-family: var(--font-tele);
+  font-size: 0.58rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--modal-accent, var(--accent));
+}
+
+.wmodal__title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--txt-bright);
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+/* Close button */
+.wmodal__close {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--txt-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  flex-shrink: 0;
+}
+
+.wmodal__close:hover {
+  background: rgba(255, 107, 53, 0.14);
+  color: var(--orange);
+  border-color: var(--orange-dim);
+}
+
+/* Modal body */
+.wmodal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.wmodal__body::-webkit-scrollbar { width: 4px; }
+.wmodal__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-pill);
+}
+
+/* Read-only content sections */
+.wmodal__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: rgba(255, 255, 255, 0.022);
+  border: var(--border-subtle);
+  border-left: 2px solid var(--modal-accent, var(--accent));
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+.wmodal__section-title {
+  font-family: var(--font-tele);
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--modal-accent, var(--accent));
+  opacity: 0.8;
+}
+
+.wmodal__section-text {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--txt-secondary);
+  margin: 0;
+}
+
+/* Section link — internal (RouterLink) or external (<a>) */
+.wmodal__section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-tele);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--modal-accent, var(--accent));
+  text-decoration: none;
+  opacity: 0.7;
+  width: fit-content;
+  transition: opacity 0.18s ease, gap 0.18s ease;
+}
+
+.wmodal__section-link:hover {
+  opacity: 1;
+  gap: 8px;
+}
+
+.wmodal__section-link svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* Stat strip */
+.wmodal__stats {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.wmodal__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--sp-3) var(--sp-4);
+  background: rgba(255, 255, 255, 0.022);
+  border: var(--border-subtle);
+  border-radius: var(--r-sm);
+  flex: 1;
+  min-width: 90px;
+}
+
+.wmodal__stat-label {
+  font-family: var(--font-tele);
+  font-size: 0.56rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.wmodal__stat-value {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--modal-accent, var(--accent));
+}
+
+/* Stat link — same visual style as section/member links */
+.wmodal__stat-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wmodal__stat-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-tele);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--modal-accent, var(--accent));
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.18s ease, gap 0.18s ease;
+}
+
+.wmodal__stat-link a:hover {
+  opacity: 1;
+  gap: 8px;
+}
+
+/* ────────────────────────────────
+   Member cards — Rólunk szekció
+   ──────────────────────────────── */
+.wmodal__members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-4);
+}
+
+.wmodal__member-card {
+  display: flex;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: var(--r-md);
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.wmodal__member-card:hover {
+  border-color: var(--modal-accent, var(--accent));
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--modal-accent, var(--accent)) 10%, transparent);
+}
+
+/* Avatar circle */
+.wmodal__member-avatar {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--modal-accent, var(--accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--modal-accent, var(--accent)) 40%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--modal-accent, var(--accent));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--modal-accent, var(--accent)) 30%, transparent));
+}
+
+/* Info column */
+.wmodal__member-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.wmodal__member-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.wmodal__member-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--txt-bright);
+  line-height: 1.2;
+}
+
+.wmodal__member-role {
+  font-family: var(--font-tele);
+  font-size: 0.52rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--modal-accent, var(--accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--modal-accent, var(--accent)) 30%, transparent);
+  color: var(--modal-accent, var(--accent));
+}
+
+.wmodal__member-bio {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--txt-muted);
+  margin: 0;
+}
+
+/* Reference link */
+.wmodal__member-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-tele);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--modal-accent, var(--accent));
+  text-decoration: none;
+  opacity: 0.7;
+  width: fit-content;
+  transition: opacity 0.18s ease, gap 0.18s ease;
+}
+
+.wmodal__member-link:hover {
+  opacity: 1;
+  gap: 8px;
+}
+
+.wmodal__member-link svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* Footer */
+.wmodal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.wmodal__btn {
+  padding: 9px 32px;
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  border: none;
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+
+.wmodal__btn--primary {
+  background: var(--modal-accent, var(--accent));
+  color: var(--clr-void);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--modal-accent, var(--accent)) 30%, transparent);
+}
+
+.wmodal__btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--modal-accent, var(--accent)) 50%, transparent);
+}
+
+/* ────────────────────────────────
+   Responsive
+   ──────────────────────────────── */
+@media (max-width: 600px) {
+  .welcome-cards { grid-template-columns: 1fr 1fr; }
+  .wmodal { max-height: 95vh; border-radius: var(--r-md); }
+  .wmodal__body { padding: var(--sp-4); }
+  .wmodal__head { padding: var(--sp-4); }
+  .wmodal__foot { padding: var(--sp-3) var(--sp-4); }
+  .wmodal__members { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .welcome-cards { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,568 @@
+/* ═══════════════════════════════════════════════
+   DASHBOARD.CSS — DashboardPage & all card types
+   ═══════════════════════════════════════════════ */
+
+/* ────────────────────────────────
+   Page wrapper
+   ──────────────────────────────── */
+.dashboard,
+.dashboard *,
+.dashboard *::before,
+.dashboard *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard {
+  position: relative;
+  width: calc(100% - var(--sidebar-w));
+  min-height: 100vh;
+  background: var(--clr-void);
+  color: var(--txt-primary);
+  font-family: var(--font-mono);
+  overflow-x: hidden;
+  padding-bottom: var(--sp-8);
+  margin-left: var(--sidebar-w);
+}
+
+/* Animated grid background */
+.dashboard .bg-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+}
+
+/* Travelling scanline over grid */
+.dashboard .bg-grid::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 255, 200, 0.025) 50%, transparent);
+  animation: scanline 9s linear infinite;
+  pointer-events: none;
+}
+
+/* ────────────────────────────────
+   Header
+   ──────────────────────────────── */
+.dashboard .dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: var(--border-accent);
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur-md);
+  box-shadow:
+    0 1px 0 rgba(0, 255, 200, 0.06),
+    var(--shadow-card);
+}
+
+.dashboard .header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.dashboard .logo-hex {
+  font-size: 20px;
+  color: var(--accent);
+  animation: spin 14s linear infinite;
+  display: block;
+  filter: drop-shadow(0 0 6px var(--accent-dim));
+}
+
+.dashboard .logo-text {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
+}
+
+.dashboard .logo-text em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+/* Glitch effect on logo text hover */
+.dashboard .logo-text::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+
+.dashboard .header-center {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+
+.dashboard .time-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dashboard .time-label {
+  font-size: 8px;
+  color: var(--txt-muted);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboard .time-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt-bright);
+  font-family: var(--font-tele);
+  letter-spacing: 0.06em;
+}
+
+/* Connection badge */
+.dashboard .conn-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+  transition: color var(--t-mid);
+}
+
+.dashboard .conn-badge.connected {
+  color: var(--accent);
+  text-shadow: 0 0 12px var(--accent-dim);
+}
+
+.dashboard .conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.dashboard .conn-badge.connected .conn-dot {
+  animation: blink 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* ────────────────────────────────
+   Dashboard Grid
+   ──────────────────────────────── */
+.dashboard .dash-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: auto;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3);
+}
+
+/* ────────────────────────────────
+   Cards — Base
+   ──────────────────────────────── */
+.dashboard .card {
+  background: var(--glass-weak);
+  border: var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  min-width: 0;
+  animation: fadeUp 0.45s both;
+  transition:
+    border-color var(--t-mid),
+    box-shadow var(--t-mid),
+    background var(--t-mid);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle inner-top highlight */
+.dashboard .card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  pointer-events: none;
+}
+
+.dashboard .card:hover {
+  border-color: rgba(0, 255, 200, 0.2);
+  box-shadow:
+    0 0 28px rgba(0, 255, 200, 0.055),
+    var(--shadow-card);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Grid column assignments */
+.dashboard .status-card {
+  grid-column: span 3;
+  animation-delay: 0.04s;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.dashboard .battery-card {
+  grid-column: span 3;
+  animation-delay: 0.08s;
+}
+.dashboard .chart-card {
+  grid-column: span 6;
+  animation-delay: 0.12s;
+}
+.dashboard .storage-card {
+  grid-column: span 4;
+  animation-delay: 0.16s;
+}
+.dashboard .scatter-card {
+  grid-column: span 8;
+  animation-delay: 0.2s;
+}
+
+/* ── Card Header ── */
+.dashboard .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dashboard .card-title {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--txt-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dashboard .card-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dashboard .legend-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  color: var(--txt-muted);
+  flex-wrap: wrap;
+}
+
+.dashboard .leg-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── uPlot ── */
+.dashboard .uplot-wrap {
+  width: 100%;
+  height: 170px;
+  overflow: hidden;
+}
+
+.dashboard .uplot {
+  width: 100% !important;
+}
+.dashboard .u-wrap {
+  width: 100% !important;
+}
+
+/* ────────────────────────────────
+   Status Card
+   ──────────────────────────────── */
+.dashboard .status-icon-wrap {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard .status-big-icon {
+  font-size: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Pulse rings */
+.dashboard .ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.2;
+}
+
+.dashboard .r1 {
+  width: 100%;
+  height: 100%;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+.dashboard .r2 {
+  width: 140%;
+  height: 140%;
+  animation: pulse-ring 2s 0.55s ease-out infinite;
+}
+
+/* Accent variants */
+.dashboard .accent-orange .status-icon-wrap {
+  color: var(--orange);
+}
+.dashboard .accent-cyan .status-icon-wrap {
+  color: var(--accent);
+}
+.dashboard .accent-gray .status-icon-wrap {
+  color: var(--clr-idle);
+}
+
+.dashboard .accent-orange {
+  border-color: rgba(255, 107, 53, 0.22);
+}
+.dashboard .accent-cyan {
+  border-color: rgba(0, 255, 200, 0.22);
+}
+
+.dashboard .accent-orange:hover {
+  box-shadow:
+    0 0 28px rgba(255, 107, 53, 0.08),
+    var(--shadow-card);
+}
+.dashboard .accent-cyan:hover {
+  box-shadow: var(--accent-glow), var(--shadow-card);
+}
+
+.dashboard .status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dashboard .s-label {
+  font-size: 8px;
+  color: var(--txt-muted);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboard .s-text {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.dashboard .accent-orange .s-text {
+  color: var(--orange);
+  text-shadow: var(--orange-glow);
+}
+.dashboard .accent-cyan .s-text {
+  color: var(--accent);
+  text-shadow: var(--accent-glow);
+}
+.dashboard .accent-gray .s-text {
+  color: var(--clr-idle);
+}
+
+.dashboard .s-sub {
+  font-size: 10px;
+  color: var(--txt-muted);
+}
+
+.dashboard .status-stats {
+  display: flex;
+  gap: var(--sp-4);
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  border-top: var(--border-subtle);
+}
+
+.dashboard .stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dashboard .stat-lbl {
+  font-size: 8px;
+  color: var(--txt-ghost);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.dashboard .stat-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txt-bright);
+  font-family: var(--font-tele);
+}
+.dashboard .stat-val em {
+  font-size: 9px;
+  color: var(--txt-muted);
+  font-style: normal;
+  margin-left: 2px;
+}
+
+/* ────────────────────────────────
+   Battery Arc Card
+   ──────────────────────────────── */
+.dashboard .battery-arc-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: var(--sp-1);
+}
+
+.dashboard .battery-svg {
+  width: 100%;
+  max-width: 180px;
+  filter: drop-shadow(0 0 8px rgba(0, 255, 200, 0.1));
+}
+
+/* ────────────────────────────────
+   Storage Pie Card
+   ──────────────────────────────── */
+.dashboard .pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 160px;
+}
+
+.dashboard .pie-svg {
+  width: 130px;
+  height: 130px;
+  flex-shrink: 0;
+  overflow: visible;
+  filter: drop-shadow(0 0 12px rgba(0, 255, 200, 0.08));
+}
+
+.dashboard .pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.dashboard .pie-leg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.dashboard .pie-leg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.dashboard .pie-leg-label {
+  color: var(--txt-secondary);
+  flex: 1;
+  font-size: 10px;
+}
+.dashboard .pie-leg-val {
+  font-weight: 700;
+  color: var(--txt-bright);
+  font-family: var(--font-display);
+  font-size: 11px;
+}
+
+/* ────────────────────────────────
+   Scatter Canvas
+   ──────────────────────────────── */
+.dashboard .scatter-canvas {
+  display: block;
+  width: 100%;
+  height: 220px;
+  border-radius: var(--r-sm);
+  background: var(--clr-void);
+}
+
+/* ────────────────────────────────
+   Responsive
+   ──────────────────────────────── */
+@media (max-width: 576px) {
+  .dashboard {
+    width: 100%;
+    margin-left: 0;
+    margin-top: var(--navbar-h);
+  }
+
+  .dashboard .dash-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .dashboard .status-card,
+  .dashboard .battery-card,
+  .dashboard .scatter-card {
+    grid-column: span 3;
+  }
+  .dashboard .storage-card {
+    grid-column: span 6;
+  }
+  .dashboard .chart-card {
+    grid-column: span 6;
+  }
+}
+
+@media (min-width: 577px) and (max-width: 1100px) {
+  .dashboard .status-card,
+  .dashboard .battery-card,
+  .dashboard .chart-card {
+    grid-column: span 4;
+  }
+  .dashboard .storage-card,
+  .dashboard .scatter-card {
+    grid-column: span 6;
+  }
+}
+
+@media (min-width: 1101px) {
+  .dashboard .dash-grid {
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+
+  .dashboard .status-card,
+  .dashboard .battery-card,
+  .dashboard .chart-card {
+    grid-column: span 4;
+  }
+  .dashboard .storage-card,
+  .dashboard .scatter-card {
+    grid-column: span 6;
+  }
+}

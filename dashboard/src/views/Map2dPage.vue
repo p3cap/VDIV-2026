@@ -1,8 +1,8 @@
-﻿<script>
+<script>
 import { useLiveWsStore } from "@/stores/liveWs.js";
 import MapComponent from "@/components/MapComponent.vue";
 export default {
-  name: "MapTestPage",
+  name: "Map2dPage",
   components: { MapComponent },
 
   computed: {
@@ -36,4 +36,4 @@ export default {
   </div>
 </template>
 
-<style src="../main.css"></style>
+<style src="../styles/main.css"></style>

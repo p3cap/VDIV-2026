@@ -1,7 +1,7 @@
 <script setup>
 import { RouterView } from 'vue-router';
 import NavComponent from './components/NavComponent.vue';
-import NavbarPhoneComponent from './components/NavbarPhoneComponent.vue';
+import NavbarPhoneComponent from './components/NavPhoneComponent.vue';
 </script>
 
 <template>
@@ -18,4 +18,4 @@ import NavbarPhoneComponent from './components/NavbarPhoneComponent.vue';
   </div>
 </template>
 
-<style src="./main.css"></style>
+<style src="./styles/main.css"></style>

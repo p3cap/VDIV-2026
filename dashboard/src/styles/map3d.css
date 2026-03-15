@@ -1,0 +1,578 @@
+/* ═══════════════════════════════════════════════
+   MAP3D.CSS — Map3dPage, Canvas, RoverHud & RoverInstruments
+   ═══════════════════════════════════════════════ */
+
+/* ────────────────────────────────
+   Page wrapper
+   ──────────────────────────────── */
+.map3d-page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+.map3d-page .instruments-anchor {
+  position: absolute;
+  bottom: 24px;
+  right: 64px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ── Loader ── */
+.map3d-page .loader {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  background: #07080c;
+  color: var(--clr-idle);
+  font-family: var(--font-tele);
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.map3d-page .loader-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.map3d-page .loader-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.map3d-page .loader-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.map3d-page .loader-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ────────────────────────────────
+   3D Canvas wrapper
+   ──────────────────────────────── */
+.canvas-wrap {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.canvas-wrap:active {
+  cursor: grabbing;
+}
+
+/* Drag hint */
+.canvas-wrap .hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity var(--t-slow);
+}
+
+.canvas-wrap:active .hint {
+  opacity: 0;
+}
+
+.canvas-wrap .hint span {
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 3px 11px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ────────────────────────────────
+   RoverHud — Full-screen overlay
+   ──────────────────────────────── */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-ui);
+}
+
+/* Top bar */
+.hud .top-bar {
+  position: absolute;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.78), transparent);
+}
+
+.hud .rover-id {
+  font-family: var(--font-tele);
+  font-size: 0.92rem;
+  letter-spacing: 0.28em;
+  color: var(--orange);
+  text-shadow: var(--orange-glow);
+  text-transform: uppercase;
+}
+
+/* Day/night chip */
+.hud .day-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 11px;
+  border-radius: var(--r-pill);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.hud .day-chip.day {
+  background: rgba(255, 180, 0, 0.13);
+  color: #ffd070;
+  border: 1px solid rgba(255, 200, 0, 0.22);
+}
+
+.hud .day-chip.night {
+  background: rgba(60, 80, 200, 0.13);
+  color: #8898ff;
+  border: 1px solid rgba(100, 120, 255, 0.2);
+}
+
+.hud .tod {
+  font-family: var(--font-tele);
+}
+
+/* ── HUD Panels ── */
+.hud .panel {
+  position: absolute;
+  top: 52px;
+  width: 196px;
+  padding: var(--sp-3) var(--sp-4);
+  background: linear-gradient(155deg, rgba(6, 10, 18, 0.92), rgba(2, 5, 10, 0.96));
+  border: var(--border-orange);
+  border-radius: var(--r-md);
+  backdrop-filter: var(--blur-md);
+  color: var(--txt-secondary);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 1px 0 rgba(255, 107, 53, 0.06);
+}
+
+.hud .panel--left {
+  left: calc(var(--sidebar-w) + var(--sp-4));
+}
+.hud .panel--right {
+  right: 64px;
+}
+
+.hud .panel-title {
+  margin: 0 0 var(--sp-2);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--orange);
+  text-shadow: 0 0 10px rgba(255, 107, 53, 0.35);
+}
+
+/* Stat list */
+.hud .stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hud .stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.7rem;
+}
+
+.hud .stat-row dt {
+  color: var(--txt-muted);
+  font-weight: 400;
+}
+.hud .stat-row dd {
+  margin: 0;
+  color: var(--txt-primary);
+  font-weight: 600;
+  font-family: var(--font-tele);
+}
+.hud .stat-row dd.green {
+  color: var(--clr-ok);
+}
+.hud .stat-row dd.orange {
+  color: var(--clr-warn);
+}
+.hud .stat-row dd.red {
+  color: var(--clr-danger);
+}
+
+.hud .mt-6 {
+  margin-top: 6px;
+}
+.hud .mono {
+  font-family: var(--font-tele);
+}
+
+/* Status badge */
+.hud .status-badge {
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: var(--r-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud .status-badge[data-status='mine'] {
+  background: rgba(255, 107, 53, 0.16);
+  color: #ff8c5a;
+  border: 1px solid rgba(255, 107, 53, 0.2);
+}
+.hud .status-badge[data-status='move'] {
+  background: rgba(68, 209, 255, 0.13);
+  color: #44d1ff;
+  border: 1px solid rgba(68, 209, 255, 0.18);
+}
+.hud .status-badge[data-status='standby'] {
+  background: rgba(80, 80, 90, 0.14);
+  color: #778899;
+  border: 1px solid rgba(80, 80, 90, 0.2);
+}
+.hud .status-badge[data-status='charge'] {
+  background: rgba(255, 210, 0, 0.12);
+  color: #ffd700;
+  border: 1px solid rgba(255, 210, 0, 0.18);
+}
+.hud .status-badge[data-status='idle'] {
+  background: rgba(60, 60, 70, 0.12);
+  color: #55566a;
+  border: 1px solid rgba(60, 60, 70, 0.16);
+}
+
+/* Divider */
+.hud .divider {
+  border: none;
+  border-top: 1px solid rgba(255, 107, 53, 0.1);
+  margin: var(--sp-2) 0;
+}
+
+/* Battery bar */
+.hud .battery-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
+}
+
+.hud .battery-track {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.hud .battery-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--color, var(--clr-ok));
+  box-shadow: 0 0 8px var(--color, var(--clr-ok));
+  transition:
+    width var(--t-slow),
+    background var(--t-slow),
+    box-shadow var(--t-slow);
+}
+
+.hud .battery-pct {
+  font-size: 0.6rem;
+  font-family: var(--font-tele);
+  min-width: 30px;
+  text-align: right;
+  transition: color var(--t-slow);
+}
+
+/* Cargo */
+.hud .cargo-list,
+.hud .legend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hud .cargo-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  font-size: 0.68rem;
+}
+
+.hud .ore-name {
+  color: var(--txt-muted);
+  font-size: 0.64rem;
+}
+.hud .ore-qty {
+  margin-left: auto;
+  color: var(--txt-primary);
+  font-family: var(--font-tele);
+}
+.hud .empty-label {
+  font-size: 0.63rem;
+  color: var(--txt-ghost);
+  font-style: italic;
+}
+
+/* Map legend */
+.hud .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 0.62rem;
+}
+
+.hud .legend-sym {
+  color: #7aaa99;
+  width: 14px;
+}
+.hud .legend-lbl {
+  color: var(--txt-muted);
+}
+
+/* Ore dots */
+.hud .ore-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hud .ore-dot[data-ore='Y'] {
+  background: #f4c542;
+  box-shadow: 0 0 5px #ffaa00;
+}
+.hud .ore-dot[data-ore='B'] {
+  background: #a8d8f0;
+  box-shadow: 0 0 5px #44aaff;
+}
+.hud .ore-dot[data-ore='G'] {
+  background: #2ed573;
+  box-shadow: 0 0 5px #00ff88;
+}
+.hud .ore-dot[data-ore='S'] {
+  background: var(--orange);
+  box-shadow: 0 0 4px var(--orange);
+}
+.hud .ore-dot[data-ore='#'] {
+  background: #4a2a14;
+}
+.hud .ore-dot[data-ore='.'] {
+  background: #2a1a0a;
+}
+
+/* Path badge */
+.hud .path-badge {
+  position: absolute;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 20px;
+  background: rgba(4, 8, 16, 0.86);
+  border: 1px solid rgba(68, 209, 255, 0.22);
+  border-radius: var(--r-pill);
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  color: var(--clr-info);
+  white-space: nowrap;
+  box-shadow: 0 0 20px rgba(68, 209, 255, 0.08);
+  text-transform: uppercase;
+}
+
+.hud .path-pulse {
+  animation: pathPulse 1.6s ease-in-out infinite;
+}
+
+/* ────────────────────────────────
+   RoverInstruments
+   ──────────────────────────────── */
+.instruments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.instruments .card {
+  background: linear-gradient(155deg, rgba(6, 10, 18, 0.93), rgba(2, 5, 10, 0.97));
+  border: var(--border-orange);
+  border-radius: var(--r-md);
+  padding: 10px 12px 8px;
+  backdrop-filter: var(--blur-md);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 1px 0 rgba(255, 107, 53, 0.05);
+  transition: border-color var(--t-mid);
+}
+
+.instruments .card-title {
+  margin: 0 0 6px;
+  font-family: var(--font-ui);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--orange);
+  text-shadow: 0 0 8px rgba(255, 107, 53, 0.3);
+}
+
+/* Speedometer */
+.instruments .speedo-card {
+  width: 188px;
+}
+.instruments .speedo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 200, 0.08));
+}
+
+.instruments .speedo-value {
+  font-family: var(--font-tele);
+  font-size: 20px;
+  fill: var(--txt-bright);
+}
+
+.instruments .speedo-unit {
+  font-family: var(--font-ui);
+  font-size: 7px;
+  fill: var(--txt-muted);
+  letter-spacing: 0.14em;
+}
+
+.instruments .speedo-tick-label {
+  font-family: var(--font-tele);
+  font-size: 9px;
+  fill: var(--txt-muted);
+}
+
+/* Gear display */
+.instruments .gear-card {
+  width: 188px;
+}
+
+.instruments .gear-display {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.instruments .gear-letter {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-md);
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-tele);
+  font-size: 1.55rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition:
+    color var(--t-mid),
+    border-color var(--t-mid),
+    box-shadow var(--t-mid);
+}
+
+.instruments .gear-name {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color var(--t-mid);
+}
+
+/* Mini battery bar in instruments */
+.instruments .batt-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.instruments .batt-label {
+  font-family: var(--font-tele);
+  font-size: 0.54rem;
+  color: var(--txt-muted);
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.instruments .batt-track {
+  flex: 1;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.instruments .batt-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  transition:
+    width var(--t-slow),
+    background var(--t-slow);
+}
+
+.instruments .batt-pct {
+  font-family: var(--font-tele);
+  font-size: 0.56rem;
+  min-width: 28px;
+  text-align: right;
+  transition: color var(--t-slow);
+}
+
+/* ────────────────────────────────
+   HeatMap (standalone widget)
+   ──────────────────────────────── */
+.heatmap {
+  width: 500px;
+  height: 600px;
+  background: var(--clr-abyss);
+  border-radius: var(--r-md);
+  border: var(--border-subtle);
+}

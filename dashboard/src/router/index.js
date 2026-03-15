@@ -1,16 +1,21 @@
 import { createRouter, createWebHistory } from "vue-router";
-import MapPage from "@/views/MapPage.vue";
+import Map2dPage from "@/views/Map2dPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
 import SettingsComponent from "@/components/SettingsComponent.vue";
 import Map3dPage from "@/views/Map3dPage.vue";
+import DocumentationPage from "@/views/DocumentationPage.vue";
 import WelcomePage from "@/views/WelcomePage.vue";
-import { path } from "pixi.js";
 
 const routes = [
   {
     path: "/",
+    name: "welcome",
+    component: WelcomePage
+  },
+  {
+    path: "/map",
     name: "map",
-    component: MapPage,
+    component: Map2dPage,
   },
   {
     path: "/dashboard",
@@ -28,10 +33,12 @@ const routes = [
     component: SettingsComponent
   },
   {
-    path: "/welcome",
-    name: "welcome",
-    component: WelcomePage
+    path : "/documentation",
+    name: "documentation",
+    component: DocumentationPage
   }
+
+
 ];
 
 const router = createRouter({
