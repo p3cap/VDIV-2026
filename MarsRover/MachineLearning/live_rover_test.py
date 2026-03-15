@@ -30,6 +30,82 @@ def ts_print(message: str):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
 
+def _decode_inputs(obs_vec: np.ndarray, env) -> dict:
+    """Convert the flattened observation vector back into readable fields."""
+    world = env.world
+    inv_w = world.inv_w or 1.0
+    inv_h = world.inv_h or 1.0
+    return {
+        "battery_pct": float(np.clip(obs_vec[0], 0.0, 1.0) * 100.0),
+        "gear_norm": float(obs_vec[1]),
+        "run_hrs": float(obs_vec[2] * 240.0),
+        "tod_pct": float(obs_vec[3] * 100.0),
+        "rover_x": int(round(obs_vec[4] / inv_w)),
+        "rover_y": int(round(obs_vec[5] / inv_h)),
+        "prev_mined_x": int(round(obs_vec[6] / inv_w)),
+        "prev_mined_y": int(round(obs_vec[7] / inv_h)),
+    }
+
+
+def _decode_outputs(action_vec: np.ndarray, env) -> dict:
+    """Human-friendly view of the policy action."""
+    world = env.world
+    gx_norm = float(np.clip(action_vec[1], 0.0, 1.0))
+    gy_norm = float(np.clip(action_vec[2], 0.0, 1.0))
+    goto_x = int(np.clip(round(gx_norm * (world.map_width - 1)), 0, world.map_width - 1))
+    goto_y = int(np.clip(round(gy_norm * (world.map_height - 1)), 0, world.map_height - 1))
+    snapped_gear = snap_gear(action_vec[0])
+    return {
+        "gear_raw": float(action_vec[0]),
+        "gear": snapped_gear.name,
+        "goto_x": goto_x,
+        "goto_y": goto_y,
+        "goto_x_norm": gx_norm,
+        "goto_y_norm": gy_norm,
+    }
+
+
+def debug_log(
+    step: int,
+    input_obs: np.ndarray,
+    action_vec: np.ndarray,
+    env,
+    reward: float,
+    mined_now: int,
+    dist_gain: float,
+    battery_cost: float,
+    minerals_left: int,
+    is_dead: bool,
+    delta_hrs: float,
+    real_dt: float,
+    sent_ok: bool,
+):
+    """Structured debugger: raw vectors first, then decoded fields."""
+    inputs = _decode_inputs(input_obs, env)
+    outputs = _decode_outputs(action_vec, env)
+
+    ts_print(f"[DEBUG] step {step}")
+    ts_print(f"  raw input : {np.array2string(input_obs, precision=3, separator=', ')}")
+    ts_print(f"  raw output: {np.array2string(action_vec, precision=3, separator=', ')}")
+    ts_print("  Inputs:")
+    ts_print(f"    rover_x: {inputs['rover_x']}")
+    ts_print(f"    rover_y: {inputs['rover_y']}")
+    ts_print(f"    prev_mined: ({inputs['prev_mined_x']}, {inputs['prev_mined_y']})")
+    ts_print(f"    battery: {inputs['battery_pct']:.1f}%   run_hrs: {inputs['run_hrs']:.1f}h   tod: {inputs['tod_pct']:.1f}%")
+    ts_print("  Outputs:")
+    ts_print(f"    gear: {outputs['gear']} (raw={outputs['gear_raw']:.3f})")
+    ts_print(f"    goto_x: {outputs['goto_x']} (norm={outputs['goto_x_norm']:.3f})")
+    ts_print(f"    goto_y: {outputs['goto_y']} (norm={outputs['goto_y_norm']:.3f})")
+    ts_print(
+        f"  Reward: {reward:.3f} (mined={mined_now}, dist_gain={dist_gain:.2f}, battery_cost={battery_cost:.2f}, minerals_left={minerals_left}, dead={is_dead})"
+    )
+    ts_print(
+        f"  Status: pos=({env.world.rover.pos.x},{env.world.rover.pos.y}) status={env.world.rover.status.name} "
+        f"sim_dt={delta_hrs:.5f}h real_dt={real_dt:.3f}s sent={'ok' if sent_ok else 'failed'}"
+    )
+    print("")  # spacer
+
+
 class LivePolicyEnv:
     """Minimal policy inference wrapper over RoverSimulationWorld."""
 
@@ -175,7 +251,8 @@ def main():
     parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000", help="Backend base URL.")
     parser.add_argument("--deterministic", dest="deterministic", action="store_true", default=True, help="Use deterministic policy actions (default).")
     parser.add_argument("--stochastic", dest="deterministic", action="store_false", help="Use stochastic policy actions.")
-    parser.add_argument("--debug-nn", action="store_true", help="Print NN inputs, outputs, and reward per step.")
+    parser.add_argument("--debug", action="store_true", help="Print raw policy inputs/outputs plus decoded fields per step.")
+    parser.add_argument("--debug-nn", dest="debug", action="store_true", help=argparse.SUPPRESS)  # legacy alias
     args = parser.parse_args()
 
     model_base = choose_model_base(args.model)
@@ -204,6 +281,7 @@ def main():
             before_mined = len(env.world.rover.mined)
             before_minerals = len(env.world.minerals())
 
+            input_obs = obs.copy()
             action, _ = model.predict(obs, deterministic=args.deterministic)
             done, delta_hrs, real_dt = env.step(action)
             obs = env.obs()
@@ -222,17 +300,27 @@ def main():
 
             reward = env.reward(mined_now, dist_gain, battery_cost, minerals_left, is_dead)
 
-            ts_print(
-                f"step={step} real_dt={real_dt:.3f}s sim_dt={delta_hrs:.5f}h "
-                f"pos=({env.world.rover.pos.x},{env.world.rover.pos.y}) status={env.world.rover.status.name} "
-                f"action={action} sent={'ok' if sent_ok else 'failed'}"
-            )
-
-            if args.debug_nn:
+            if args.debug:
+                debug_log(
+                    step=step,
+                    input_obs=input_obs,
+                    action_vec=action,
+                    env=env,
+                    reward=reward,
+                    mined_now=mined_now,
+                    dist_gain=dist_gain,
+                    battery_cost=battery_cost,
+                    minerals_left=minerals_left,
+                    is_dead=is_dead,
+                    delta_hrs=delta_hrs,
+                    real_dt=real_dt,
+                    sent_ok=sent_ok,
+                )
+            else:
                 ts_print(
-                    "  nn_input="
-                    + np.array2string(obs, precision=3, separator=", ")
-                    + f" | reward={reward:.3f} (mined={mined_now}, dist_gain={dist_gain:.1f}, battery_cost={battery_cost:.2f}, minerals_left={minerals_left}, dead={is_dead})"
+                    f"step={step} real_dt={real_dt:.3f}s sim_dt={delta_hrs:.5f}h "
+                    f"pos=({env.world.rover.pos.x},{env.world.rover.pos.y}) status={env.world.rover.status.name} "
+                    f"action={action} sent={'ok' if sent_ok else 'failed'}"
                 )
 
             if done or (args.steps > 0 and step >= args.steps):

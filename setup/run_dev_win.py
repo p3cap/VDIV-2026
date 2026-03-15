@@ -37,7 +37,7 @@ mode = input("Select rover algorythm [test, ai, brain, none]")
 if mode == "test":
     procs.append(new_terminal(f"{sys.executable} main.py", mars))
 elif mode == "ai":
-    procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py --debug-nn", mars))
+    procs.append(new_terminal(f"{sys.executable} MachineLearning/live_rover_test.py --debug", mars))
 elif mode == "brain":
     procs.append(new_terminal(f"{sys.executable} brain.py", mars))
 

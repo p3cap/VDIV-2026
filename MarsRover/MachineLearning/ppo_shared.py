@@ -22,9 +22,9 @@ from RoverClass import GEARS
 
 # Observation layout constants
 OBS_STATIC_FIELDS = 8  # battery, gear, run_hrs, tod, rx, ry, prev_mined x/y
-DEFAULT_MINERAL_COUNT = 3
+DEFAULT_MINERAL_COUNT = 10
 # Toggle inclusion of distance per mineral (Manhattan placeholder for A*)
-USE_MINERAL_DISTANCE = False
+USE_MINERAL_DISTANCE = True
 PER_MINERAL_FIELDS = 3 if USE_MINERAL_DISTANCE else 2
 
 # Shared gear mapping helpers

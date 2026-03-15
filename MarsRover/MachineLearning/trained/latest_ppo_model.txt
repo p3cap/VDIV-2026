@@ -1,1 +1,1 @@
-no_disatnce-10m
+distance-1m
