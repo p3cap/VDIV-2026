@@ -94,9 +94,9 @@ class MinuteProgressCallback(BaseCallback):
 class RoverEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    NO_MOVE_PENALTY_BASE   = 2.0
-    NO_MOVE_PENALTY_STREAK = 0.5
-    NO_MOVE_PENALTY_CAP    = 8.0
+    NO_MOVE_PENALTY_BASE   = 6.0
+    NO_MOVE_PENALTY_STREAK = 2.0
+    NO_MOVE_PENALTY_CAP    = 30.0
     MINERAL_COUNT          = DEFAULT_MINERAL_COUNT
 
     # obs: [battery, gear, run_hrs, tod, rx, ry, pmx, pmy] + MINERAL_COUNT×[dist,x,y]
@@ -125,6 +125,7 @@ class RoverEnv(gym.Env):
         self._cycle_hrs      = self.world.sim.day_hrs + self.world.sim.night_hrs
         self._prev_mined     = Vector2(0, 0)
         self._no_move_streak = 0
+        self._mining_streak  = 0
         self._total_mined    = 0
         # mineral cache: list of (Vector2, manhattan_dist)
         self._mineral_cache: list[tuple] = []
@@ -152,13 +153,14 @@ class RoverEnv(gym.Env):
 
     def _reward(self, mined_now: int, dist_gain: float,
                 battery_cost: float, minerals_left: int, is_dead: bool) -> float:
-        reward, self._no_move_streak = compute_reward(
+        reward, self._no_move_streak, self._mining_streak = compute_reward(
             mined_now=mined_now,
             dist_gain=dist_gain,
             battery_cost=battery_cost,
             minerals_left=minerals_left,
             is_dead=is_dead,
             no_move_streak=self._no_move_streak,
+            mining_streak=self._mining_streak,
             penalty_base=self.NO_MOVE_PENALTY_BASE,
             penalty_streak=self.NO_MOVE_PENALTY_STREAK,
             penalty_cap=self.NO_MOVE_PENALTY_CAP,
@@ -172,6 +174,7 @@ class RoverEnv(gym.Env):
         self.world.reset()
         self._prev_mined     = Vector2(0, 0)
         self._no_move_streak = 0
+        self._mining_streak  = 0
         self._total_mined    = 0
         self._cycle_hrs      = self.world.sim.day_hrs + self.world.sim.night_hrs
         self._minerals_dirty = True

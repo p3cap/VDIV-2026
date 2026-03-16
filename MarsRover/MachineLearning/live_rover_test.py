@@ -114,6 +114,7 @@ class LivePolicyEnv:
         self.prev_mined = None
         self.total_mined = 0
         self._no_move_streak = 0
+        self._mining_streak = 0
         self.world = RoverSimulationWorld(
             run_hrs=run_hrs,
             delta_mode=delta_mode,
@@ -171,13 +172,14 @@ class LivePolicyEnv:
         return done, delta_hrs, real_dt_seconds
 
     def reward(self, mined_now: int, dist_gain: float, battery_cost: float, minerals_left: int, is_dead: bool) -> float:
-        reward, self._no_move_streak = compute_reward(
+        reward, self._no_move_streak, self._mining_streak = compute_reward(
             mined_now=mined_now,
             dist_gain=dist_gain,
             battery_cost=battery_cost,
             minerals_left=minerals_left,
             is_dead=is_dead,
             no_move_streak=self._no_move_streak,
+            mining_streak=self._mining_streak,
         )
         return reward
 

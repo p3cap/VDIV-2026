@@ -1,40 +1,38 @@
 # UNFINISHED
-# Machine Learning Inputs, outputs
+
+# Mars Rover Machine Learning Documentation
+- [Concept](#concept)
+- [NN Structure](#nn-structure)
+
+
 ## concept:
-Cutom rover env
-give rover basic info
-for ML optimistion the DQN will get the closest n amount of ores
-and can order the rover to move to the given ore.
-
-## Inputs:
-*Find out how to send lists thru nodes, optimised*
-*nodes can only have value 0-1*
-
-- battery
-- gear (0,0.5,1)
-- run_hrs 
-- time of day
-- rover x
-- rover y
-- previoulsy mined x
-- previoulsy mined y
+Using a PPO ([Proximal Policy Optimization](https://spinningup.openai.com/en/latest/algorithms/ppo.html)) based machine learning with the usage of the [stable_baselines3](https://github.com/DLR-RM/stable-baselines3) library.
 
 
-- closest mineral 1 - distance
-- closest mineral 1 - x
-- closest mineral 1 - y
-- closest mineral 2 - distance
-- closest mineral 2 - x
-- closest mineral 2 - y
-- closest mineral 3 - distance
-- closest mineral 3 - x
-- closest mineral 3 - y
-- ...
+## NN Structure
+### Inputs:
 
-... futtatok rá tesztet mennyi a legoptimálisabb mennyiség (szerintem olyan 30 körül)
+- rover battery
+- rover gear
+- simulation run hours 
+- simulation tod
+- rover x pos
+- rover y pos
+- previoulsy mined ore x pos
+- previoulsy mined ore y pos
+- n amounts of ore data
+  - closest ore n - path finding distance
+  - closest ore n - x pos
+  - closest ore n - y pos
 
-## Ouputs
-- set_gear (0,1,2)
+### Ouputs
+- set gear
 - goto pos x
 - goto pos y
+
+### Functions
+Autmatically mines the given tile if the rover landed on top of it.
+
+## Usage
+
 

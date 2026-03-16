@@ -108,13 +108,34 @@ def compute_reward(
     minerals_left: int,
     is_dead: bool,
     no_move_streak: int,
-    penalty_base: float = 2.0,
-    penalty_streak: float = 0.5,
-    penalty_cap: float = 8.0,
-) -> tuple[float, int]:
-    """Shared reward shaping with streak bookkeeping."""
-    reward = mined_now * 20.0 + dist_gain * 0.1 - battery_cost * 0.02 - 0.05
+    mining_streak: int,
+    penalty_base: float = 6.0,
+    penalty_streak: float = 2.0,
+    penalty_cap: float = 30.0,
+) -> tuple[float, int, int]:
+    """Shared reward shaping with streak bookkeeping.
 
+    Goals:
+    - Strongly reward mining, with a bonus for consecutive mining (streak).
+    - Penalize idling (no move + no mine) heavily.
+    - Small time penalty to push faster collection.
+    """
+    reward = -0.1  # time pressure for faster mining
+
+    # Mining reward with streak bonus
+    if mined_now > 0:
+        mining_streak += 1
+        streak_bonus = min(24.0, 4.0 * mining_streak)
+        reward += mined_now * (22.0 + streak_bonus)
+    else:
+        mining_streak = 0
+        reward -= 1.2  # no mining this step (keeps pressure to find minerals)
+
+    # Movement/battery shaping (fast but not reckless)
+    reward += dist_gain * 0.15
+    reward -= battery_cost * 0.03
+
+    # Large idle penalty when neither moving nor mining
     if dist_gain <= 0 and mined_now <= 0:
         no_move_streak += 1
         reward -= min(penalty_cap, penalty_base + penalty_streak * no_move_streak)
@@ -122,8 +143,8 @@ def compute_reward(
         no_move_streak = 0
 
     if is_dead:
-        reward -= 200.0
+        reward -= 150.0
     if minerals_left == 0:
-        reward += 50.0
+        reward += 80.0
 
-    return float(reward), no_move_streak
+    return float(reward), no_move_streak, mining_streak
