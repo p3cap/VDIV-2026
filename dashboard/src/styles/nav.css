@@ -11,18 +11,17 @@
   top: 0;
   height: 100vh;
   width: var(--sidebar-w);
-  background: linear-gradient(
-    180deg,
-    rgba(0, 153, 255, 0.9) 0%,
-    rgba(0, 220, 200, 0.85) 50%,
-    rgba(98, 187, 255, 0.9) 100%
-  );
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(0, 255, 200, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(255, 107, 53, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 40%, rgba(0, 153, 255, 0.1) 0%, transparent 50%),
+    var(--clr-void);
   box-shadow:
     4px 0 24px rgba(0, 153, 255, 0.25),
     inset -1px 0 0 rgba(255, 255, 255, 0.12);
   overflow: hidden;
+  backdrop-filter: blur(12px);
   z-index: 999;
-  border-radius: 0 var(--r-lg) var(--r-lg) 0;
 }
 
 /* Subtle scanline overlay */
@@ -30,14 +29,13 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(0, 255, 200, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(255, 107, 53, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 40%, rgba(0, 153, 255, 0.1) 0%, transparent 50%),
+    var(--clr-void);
   pointer-events: none;
+  backdrop-filter: blur(12px);
 }
 
 .sidebar ul {
@@ -73,7 +71,9 @@
   align-items: center;
   gap: 1.2rem;
   padding: 0.85rem 1.15rem;
-  color: rgba(10, 40, 100, 0.85);
+  color: green;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -143,9 +143,9 @@
   height: var(--navbar-h);
   background: linear-gradient(
     90deg,
-    rgba(0, 153, 255, 0.95) 0%,
-    rgba(0, 220, 200, 0.88) 50%,
-    rgba(98, 187, 255, 0.95) 100%
+    var(--clr-void) 0%,
+    var(--clr-abyss)50%,
+    var(--clr-deep) 100%
   );
   backdrop-filter: var(--blur-md);
   display: flex;
@@ -156,8 +156,6 @@
   box-shadow:
     0 3px 20px rgba(0, 153, 255, 0.3),
     0 1px 0 rgba(255, 255, 255, 0.15);
-  border-bottom-left-radius: var(--r-lg);
-  border-bottom-right-radius: var(--r-lg);
 }
 
 .mobile-nav .logo img {

@@ -759,8 +759,8 @@ function onPointerMove(e) {
 		camApply()
 	}
 	if (cam.orbitDragging) {
-		cam.vTheta = (e.clientX - cam.orbitLastX) * 0.008
-		cam.vPhi = (e.clientY - cam.orbitLastY) * 0.008
+		cam.vTheta = (e.clientX - cam.orbitLastX) * -0.008
+		cam.vPhi = (e.clientY - cam.orbitLastY) * -0.008
 		cam.theta += cam.vTheta
 		cam.phi += cam.vPhi
 		cam.orbitLastX = e.clientX
