@@ -7,7 +7,7 @@
    Page wrapper
    ──────────────────────────────── */
 .welcome {
-  width: 100vw;
+  width: calc(100vw - var(--sidebar-w));
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -22,6 +22,7 @@
     var(--clr-void);
   position: relative;
   overflow: hidden;
+  margin-left: var(--sidebar-w);
 }
 
 /* Background grid */
@@ -41,7 +42,7 @@
 .welcome::after {
   content: '';
   position: absolute;
-  left: 0; right: 0;
+  right: 0;
   height: 200px;
   background: linear-gradient(to bottom, transparent, rgba(0, 255, 200, 0.018) 50%, transparent);
   animation: scanline 12s linear infinite;
@@ -113,6 +114,7 @@
   gap: var(--sp-5);
   width: 100%;
   max-width: 1080px;
+  justify-content: center;
 }
 
 /* ── Single card ── */
@@ -281,7 +283,6 @@
 .wmodal {
   width: 100%;
   max-width: 780px;
-  max-height: 88vh;
   background: linear-gradient(145deg, rgba(15, 26, 46, 0.99), rgba(7, 12, 24, 1));
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-top: 2px solid var(--modal-accent, var(--accent));
@@ -666,9 +667,9 @@
 /* ────────────────────────────────
    Responsive
    ──────────────────────────────── */
-@media (max-width: 600px) {
-  .welcome-cards { grid-template-columns: 1fr 1fr; }
-  .wmodal { max-height: 95vh; border-radius: var(--r-md); }
+@media (max-width: 576px) {
+  .welcome{ width: 100vw; margin-left: 0; margin-top: var(--navbar-h);}
+  .wmodal {  border-radius: var(--r-md); margin-left: var(--sidebar-w); margin-top: calc(var(--navbar-h) * 3); }
   .wmodal__body { padding: var(--sp-4); }
   .wmodal__head { padding: var(--sp-4); }
   .wmodal__foot { padding: var(--sp-3) var(--sp-4); }

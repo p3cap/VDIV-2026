@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════
    MAP3D.CSS — Map3dPage, Canvas, RoverHud & RoverInstruments
+   Responsive: mobile (≤480px), tablet (481–1024px), desktop (1025px+)
    ═══════════════════════════════════════════════ */
 
 /* ────────────────────────────────
@@ -51,12 +52,8 @@
   background: var(--orange);
   animation: dotPulse 1.2s ease-in-out infinite;
 }
-.map3d-page .loader-dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.map3d-page .loader-dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.map3d-page .loader-dot:nth-child(2) { animation-delay: 0.2s; }
+.map3d-page .loader-dot:nth-child(3) { animation-delay: 0.4s; }
 
 /* ────────────────────────────────
    3D Canvas wrapper
@@ -72,9 +69,7 @@
   cursor: default;
 }
 
-.canvas-wrap:active {
-  cursor: grabbing;
-}
+.canvas-wrap:active { cursor: grabbing; }
 
 /* Drag hint */
 .canvas-wrap .hint {
@@ -91,9 +86,7 @@
   transition: opacity var(--t-slow);
 }
 
-.canvas-wrap:active .hint {
-  opacity: 0;
-}
+.canvas-wrap:active .hint { opacity: 0; }
 
 .canvas-wrap .hint span {
   background: rgba(0, 0, 0, 0.6);
@@ -162,9 +155,7 @@
   border: 1px solid rgba(100, 120, 255, 0.2);
 }
 
-.hud .tod {
-  font-family: var(--font-tele);
-}
+.hud .tod { font-family: var(--font-tele); }
 
 /* ── HUD Panels ── */
 .hud .panel {
@@ -180,14 +171,15 @@
   box-shadow:
     var(--shadow-float),
     inset 0 1px 0 rgba(255, 107, 53, 0.06);
+  /* Mobile: hidden by default, toggled via .panel--open */
+  transition:
+    opacity var(--t-mid),
+    transform var(--t-mid),
+    visibility var(--t-mid);
 }
 
-.hud .panel--left {
-  left: calc(var(--sidebar-w) + var(--sp-4));
-}
-.hud .panel--right {
-  right: 64px;
-}
+.hud .panel--left  { left: calc(var(--sidebar-w) + var(--sp-4)); }
+.hud .panel--right { right: 64px; }
 
 .hud .panel-title {
   margin: 0 0 var(--sp-2);
@@ -200,11 +192,8 @@
 }
 
 /* Stat list */
-.hud .stat-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+.hud .stat-list { list-style: none; margin: 0; padding: 0; }
+
 .hud .stat-row {
   display: flex;
   justify-content: space-between;
@@ -213,32 +202,19 @@
   font-size: 0.7rem;
 }
 
-.hud .stat-row dt {
-  color: var(--txt-muted);
-  font-weight: 400;
-}
+.hud .stat-row dt { color: var(--txt-muted); font-weight: 400; }
 .hud .stat-row dd {
   margin: 0;
   color: var(--txt-primary);
   font-weight: 600;
   font-family: var(--font-tele);
 }
-.hud .stat-row dd.green {
-  color: var(--clr-ok);
-}
-.hud .stat-row dd.orange {
-  color: var(--clr-warn);
-}
-.hud .stat-row dd.red {
-  color: var(--clr-danger);
-}
+.hud .stat-row dd.green  { color: var(--clr-ok); }
+.hud .stat-row dd.orange { color: var(--clr-warn); }
+.hud .stat-row dd.red    { color: var(--clr-danger); }
 
-.hud .mt-6 {
-  margin-top: 6px;
-}
-.hud .mono {
-  font-family: var(--font-tele);
-}
+.hud .mt-6 { margin-top: 6px; }
+.hud .mono { font-family: var(--font-tele); }
 
 /* Status badge */
 .hud .status-badge {
@@ -250,31 +226,11 @@
   text-transform: uppercase;
 }
 
-.hud .status-badge[data-status='mine'] {
-  background: rgba(255, 107, 53, 0.16);
-  color: #ff8c5a;
-  border: 1px solid rgba(255, 107, 53, 0.2);
-}
-.hud .status-badge[data-status='move'] {
-  background: rgba(68, 209, 255, 0.13);
-  color: #44d1ff;
-  border: 1px solid rgba(68, 209, 255, 0.18);
-}
-.hud .status-badge[data-status='standby'] {
-  background: rgba(80, 80, 90, 0.14);
-  color: #778899;
-  border: 1px solid rgba(80, 80, 90, 0.2);
-}
-.hud .status-badge[data-status='charge'] {
-  background: rgba(255, 210, 0, 0.12);
-  color: #ffd700;
-  border: 1px solid rgba(255, 210, 0, 0.18);
-}
-.hud .status-badge[data-status='idle'] {
-  background: rgba(60, 60, 70, 0.12);
-  color: #55566a;
-  border: 1px solid rgba(60, 60, 70, 0.16);
-}
+.hud .status-badge[data-status='mine']    { background: rgba(255, 107, 53, 0.16); color: #ff8c5a; border: 1px solid rgba(255, 107, 53, 0.2); }
+.hud .status-badge[data-status='move']    { background: rgba(68, 209, 255, 0.13);  color: #44d1ff; border: 1px solid rgba(68, 209, 255, 0.18); }
+.hud .status-badge[data-status='standby'] { background: rgba(80, 80, 90, 0.14);   color: #778899; border: 1px solid rgba(80, 80, 90, 0.2); }
+.hud .status-badge[data-status='charge']  { background: rgba(255, 210, 0, 0.12);  color: #ffd700; border: 1px solid rgba(255, 210, 0, 0.18); }
+.hud .status-badge[data-status='idle']    { background: rgba(60, 60, 70, 0.12);   color: #55566a; border: 1px solid rgba(60, 60, 70, 0.16); }
 
 /* Divider */
 .hud .divider {
@@ -321,11 +277,7 @@
 
 /* Cargo */
 .hud .cargo-list,
-.hud .legend-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+.hud .legend-list { list-style: none; margin: 0; padding: 0; }
 
 .hud .cargo-item {
   display: flex;
@@ -335,20 +287,9 @@
   font-size: 0.68rem;
 }
 
-.hud .ore-name {
-  color: var(--txt-muted);
-  font-size: 0.64rem;
-}
-.hud .ore-qty {
-  margin-left: auto;
-  color: var(--txt-primary);
-  font-family: var(--font-tele);
-}
-.hud .empty-label {
-  font-size: 0.63rem;
-  color: var(--txt-ghost);
-  font-style: italic;
-}
+.hud .ore-name  { color: var(--txt-muted); font-size: 0.64rem; }
+.hud .ore-qty   { margin-left: auto; color: var(--txt-primary); font-family: var(--font-tele); }
+.hud .empty-label { font-size: 0.63rem; color: var(--txt-ghost); font-style: italic; }
 
 /* Map legend */
 .hud .legend-item {
@@ -359,13 +300,8 @@
   font-size: 0.62rem;
 }
 
-.hud .legend-sym {
-  color: #7aaa99;
-  width: 14px;
-}
-.hud .legend-lbl {
-  color: var(--txt-muted);
-}
+.hud .legend-sym { color: #7aaa99; width: 14px; }
+.hud .legend-lbl { color: var(--txt-muted); }
 
 /* Ore dots */
 .hud .ore-dot {
@@ -375,28 +311,12 @@
   flex-shrink: 0;
 }
 
-.hud .ore-dot[data-ore='Y'] {
-  background: #f4c542;
-  box-shadow: 0 0 5px #ffaa00;
-}
-.hud .ore-dot[data-ore='B'] {
-  background: #a8d8f0;
-  box-shadow: 0 0 5px #44aaff;
-}
-.hud .ore-dot[data-ore='G'] {
-  background: #2ed573;
-  box-shadow: 0 0 5px #00ff88;
-}
-.hud .ore-dot[data-ore='S'] {
-  background: var(--orange);
-  box-shadow: 0 0 4px var(--orange);
-}
-.hud .ore-dot[data-ore='#'] {
-  background: #4a2a14;
-}
-.hud .ore-dot[data-ore='.'] {
-  background: #2a1a0a;
-}
+.hud .ore-dot[data-ore='Y'] { background: #f4c542; box-shadow: 0 0 5px #ffaa00; }
+.hud .ore-dot[data-ore='B'] { background: #a8d8f0; box-shadow: 0 0 5px #44aaff; }
+.hud .ore-dot[data-ore='G'] { background: #2ed573; box-shadow: 0 0 5px #00ff88; }
+.hud .ore-dot[data-ore='S'] { background: var(--orange); box-shadow: 0 0 4px var(--orange); }
+.hud .ore-dot[data-ore='#'] { background: #4a2a14; }
+.hud .ore-dot[data-ore='.'] { background: #2a1a0a; }
 
 /* Path badge */
 .hud .path-badge {
@@ -419,9 +339,7 @@
   text-transform: uppercase;
 }
 
-.hud .path-pulse {
-  animation: pathPulse 1.6s ease-in-out infinite;
-}
+.hud .path-pulse { animation: pathPulse 1.6s ease-in-out infinite; }
 
 /* ────────────────────────────────
    RoverInstruments
@@ -457,9 +375,8 @@
 }
 
 /* Speedometer */
-.instruments .speedo-card {
-  width: 188px;
-}
+.instruments .speedo-card { width: 188px; }
+
 .instruments .speedo-svg {
   display: block;
   width: 100%;
@@ -488,9 +405,7 @@
 }
 
 /* Gear display */
-.instruments .gear-card {
-  width: 188px;
-}
+.instruments .gear-card { width: 188px; }
 
 .instruments .gear-display {
   display: flex;
@@ -575,4 +490,277 @@
   background: var(--clr-abyss);
   border-radius: var(--r-md);
   border: var(--border-subtle);
+}
+
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE OVERRIDES
+   Breakpoints:
+     xs  : ≤ 480px  (mobile)
+     sm  : ≤ 576px  (max-width requested)
+     md  : 481–1024px (tablet)
+     lg  : ≥ 1025px  (desktop — base styles above)
+   ═══════════════════════════════════════════════ */
+
+/* ────────────────────────────────
+   TABLET  (481px – 1024px)
+   ──────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 481px) {
+
+  /* Instruments: move out of corner anchor into a bottom bar */
+  .map3d-page .instruments-anchor {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    pointer-events: auto;
+    padding: 8px 16px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.82), transparent);
+    z-index: 20;
+  }
+
+  .instruments {
+    flex-direction: row;
+    gap: 12px;
+    align-items: flex-end;
+    pointer-events: auto;
+  }
+
+  .instruments .speedo-card,
+  .instruments .gear-card {
+    width: 160px;
+  }
+
+  /* HUD panels: hidden by default, shown when .panel--open is toggled */
+  .hud .panel {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    pointer-events: none;
+  }
+
+  .hud .panel.panel--open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* HUD toggle buttons — shown on tablet/mobile */
+  .hud .panel-toggle {
+    display: inline-flex;
+    position: absolute;
+    top: 52px;
+    pointer-events: auto;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-md);
+    background: rgba(6, 10, 18, 0.88);
+    border: var(--border-orange);
+    color: var(--orange);
+    font-size: 0.7rem;
+    cursor: pointer;
+    backdrop-filter: var(--blur-md);
+    box-shadow: var(--shadow-float);
+    transition: background var(--t-mid);
+    z-index: 30;
+  }
+
+  .hud .panel-toggle:hover {
+    background: rgba(255, 107, 53, 0.12);
+  }
+
+  .hud .panel-toggle--left  { left: calc(var(--sidebar-w) + var(--sp-4)); }
+  .hud .panel-toggle--right { right: 64px; }
+
+  /* Nudge panels so they don't overlap the toggle buttons */
+  .hud .panel--left  { top: 92px; }
+  .hud .panel--right { top: 92px; }
+
+  /* Top bar: tighter on tablet */
+  .hud .top-bar { padding: var(--sp-2) var(--sp-3); }
+
+  /* Path badge: lift above bottom instruments bar */
+  .hud .path-badge { bottom: 88px; }
+
+  /* HeatMap */
+  .heatmap {
+    width: 100%;
+    max-width: 460px;
+    height: 480px;
+  }
+}
+
+/* ────────────────────────────────
+   MOBILE  (≤ 576px)
+   Covers the ≤480px breakpoint and
+   the requested max-width of 576px
+   ──────────────────────────────── */
+@media (max-width: 576px) {
+
+  /* ── Instruments → fixed bottom bar ── */
+  .map3d-page .instruments-anchor {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    padding: 6px 12px env(safe-area-inset-bottom, 0px);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 60%, transparent);
+    display: flex;
+    justify-content: center;
+    pointer-events: auto;
+    z-index: 40;
+  }
+
+  .instruments {
+    flex-direction: row;
+    gap: 8px;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 420px;
+    pointer-events: auto;
+  }
+
+  /* Cards stretch to fill the bar evenly */
+  .instruments .card {
+    flex: 1;
+    padding: 7px 10px 6px;
+  }
+
+  .instruments .speedo-card,
+  .instruments .gear-card {
+    width: auto; /* flex handles it */
+  }
+
+  /* Shrink gear letter on very small screens */
+  .instruments .gear-letter {
+    width: 34px;
+    height: 34px;
+    font-size: 1.15rem;
+  }
+
+  .instruments .gear-name { font-size: 0.62rem; }
+
+  /* ── Top bar ── */
+  .hud .top-bar {
+    left: 0; /* sidebar collapses on mobile */
+    padding: var(--sp-2) var(--sp-3);
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .hud .rover-id { font-size: 0.78rem; letter-spacing: 0.18em; }
+
+  /* ── HUD panels: hidden, slide in from side on open ── */
+  .hud .panel {
+    width: min(88vw, 260px);
+    top: 44px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    pointer-events: none;
+  }
+
+  .hud .panel--left  { left: 8px; }
+  .hud .panel--right { right: 8px; }
+
+  .hud .panel.panel--open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+    /* Stack both panels from the left edge on very narrow screens */
+    z-index: 50;
+  }
+
+  /* Toggle buttons */
+  .hud .panel-toggle {
+    display: inline-flex;
+    position: absolute;
+    top: 44px;
+    pointer-events: auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-md);
+    background: rgba(6, 10, 18, 0.88);
+    border: var(--border-orange);
+    color: var(--orange);
+    font-size: 0.65rem;
+    cursor: pointer;
+    backdrop-filter: var(--blur-md);
+    box-shadow: var(--shadow-float);
+    transition: background var(--t-mid);
+    z-index: 30;
+  }
+
+  .hud .panel-toggle:hover { background: rgba(255, 107, 53, 0.12); }
+  .hud .panel-toggle--left  { left: 8px; }
+  .hud .panel-toggle--right { right: 8px; }
+
+  /* Panels open below their toggle */
+  .hud .panel--left,
+  .hud .panel--right { top: 80px; }
+
+  /* ── Path badge: lift above instruments bar ── */
+  .hud .path-badge {
+    bottom: 76px;
+    padding: 4px 14px;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Canvas hint: smaller text ── */
+  .canvas-wrap .hint span {
+    font-size: 9px;
+    padding: 2px 8px;
+  }
+
+  /* ── HeatMap: full-width ── */
+  .heatmap {
+    width: 100%;
+    height: min(60vw, 340px);
+  }
+}
+
+/* ────────────────────────────────
+   EXTRA NARROW  (≤ 380px)
+   ──────────────────────────────── */
+@media (max-width: 380px) {
+
+  .instruments .card { padding: 5px 8px 4px; }
+  .instruments .card-title { font-size: 0.44rem; letter-spacing: 0.18em; }
+  .instruments .batt-label { display: none; } /* reclaim space */
+
+  .hud .panel { width: min(92vw, 240px); }
+  .hud .rover-id { font-size: 0.68rem; }
+}
+
+/* ────────────────────────────────
+   Hint line visibility
+   ──────────────────────────────── */
+
+/* Desktop: show full keyboard/mouse hints, hide mobile hint */
+.canvas-wrap .hint--mobile  { display: none; }
+.canvas-wrap .hint--desktop { display: block; }
+
+@media (max-width: 1024px) {
+  /* Tablet & mobile: hide keyboard hint, show touch hint only */
+  .canvas-wrap .hint--desktop { display: none; }
+  .canvas-wrap .hint--mobile  { display: block; }
+}
+
+/* ────────────────────────────────
+   Hide toggles on desktop
+   (they only exist in the DOM for
+    tablet/mobile interaction)
+   ──────────────────────────────── */
+@media (min-width: 1025px) {
+  .hud .panel-toggle { display: none; }
 }
