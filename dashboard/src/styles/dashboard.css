@@ -69,6 +69,7 @@
   box-shadow:
     0 1px 0 rgba(0, 255, 200, 0.06),
     var(--shadow-card);
+  width: calc(100vw- var(--sidebar-w));
 }
 
 .dashboard .header-left {
