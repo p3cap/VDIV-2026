@@ -1,3 +1,27 @@
+"""
+Mars Rover – Vadász Dénes Informatika Verseny 2026
+
+Feladatleírás szerinti energiamodell:
+  1 tick = fél óra
+  Sebesség v = 1/2/3 blokk/tick
+  Mozgási fogyasztás: E = 2 * v² /tick
+    v=1: 2/tick   v=2: 8/tick   v=3: 18/tick
+  Nappal töltés: +10/tick
+  Bányászás: 2/tick, 1 tick ideig tart
+  Standby: 1/tick
+
+Nappal nettó mozgás:
+  v=1: 2-10 = -8  (töltődik!)
+  v=2: 8-10 = -2  (töltődik!)
+  v=3: 18-10 = +8 (merül)
+
+Éjjel nettó mozgás:
+  v=1: +2   v=2: +8   v=3: +18
+
+Döntési logika: mindig a LEGKÖZELEBBI elérhető ércet választja.
+Az energiakorlát kizárja a túl messze lévő célokat.
+"""
+
 from math import ceil
 
 from Simulation_env import RoverSimulationWorld
@@ -5,7 +29,6 @@ from RoverClass import STATUS, GEARS
 from Global import Vector2
 from RoverLogger import RoverLogger
 
-# Optional C++ backend for A* (pybind11 module). Imported once at module level.
 try:
     import cpp_path as cpp_mod
     CPP_AVAILABLE = True
@@ -13,68 +36,42 @@ except Exception:
     cpp_mod = None
     CPP_AVAILABLE = False
 
-# base url
-BASE_URL = "http://127.0.0.1:8000"
+# ═══════════════════════════════════════
+# KONFIGURÁCIÓ
+# ═══════════════════════════════════════
 
-# Initialize RoverLogger
-logger = RoverLogger(BASE_URL)
+BASE_URL     = "http://127.0.0.1:8000"
+logger       = RoverLogger(BASE_URL)
+CSV_PATH     = r"MarsRover/data/mars_map_50x50.csv"
 
-# A térkép beolv
-CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
+delta_mode   = "set_time"
+delta_hrs    = 0.5
+tick_seconds = 1
+env_speed    = 1.0
+send_every   = 1
+run_hrs      = 240.0
+USE_SERVER   = True
 
-# Szimuláció paraméterei
-delta_mode = "set_time"
-delta_hrs = 0.5          # 1 tick = fél óra
-tick_seconds = 1         
-env_speed = 1.0
-send_every = 1
-run_hrs = 240.0
+BASE_POS = (0, 0)
 
-# adat küldés engedett a beckendnek
-USE_SERVER = True
+# Energiamodell – feladatleírás szerint
+BATTERY_CAP  = 100
+ENERGY_K     = 2
+DAY_CHARGE   = 10
+MINE_COST    = 2
+STANDBY_COST = 1
 
-# Az ércek értékei
-ORE_VALUES = {
-    "Y": 1,
-    "G": 1,
-    "B": 1,
-}
+# Biztonsági tartalékok
+DAY_RESERVE   = 5
+NIGHT_RESERVE = 15
+RETURN_MARGIN = 1.1   # 10% margó a hazaútra
+END_TICKS     = 30    # ennyi tick maradt -> hazamegyünk
 
-# ENERGIA / IDŐ SZABÁLYOK
+ORE_VALUES = {"Y": 1, "G": 1, "B": 1}
 
-# Nappal félóránként ennyit töltődik
-DAY_CHARGE_PER_HALF_HOUR = 10
-
-# Ha áll és nem bányászik
-STANDBY_CONSUMPTION = 1
-
-# Ha áll és bányászik
-MINING_CONSUMPTION = 2
-
-# Max akkukapacitás
-BATTERY_CAP = 100
-
-# Vész tartalék minimum
-MIN_EMERGENCY_BATTERY = 6
-
-# Éjjel nagyobb tartalékot hagyunk, mert nincs töltés
-NIGHT_RESERVE = 12
-
-# KLASZTER / HELYI KITERMELÉS PARAMÉTEREK
-
-
-# Mekkora sugárban tekintsük ugyanazon klaszter részének az érceket
-# Ha túl kicsi, túl korán elmegy.
-# Ha túl nagy, túl sokáig ragad egy rossz zónában.
-CLUSTER_RADIUS = 10
-
-# Mekkora bónuszt kapjon a sűrű klaszter
-DENSE_CLUSTER_BONUS = 18
-
-# Ha már egy klaszterben vagyunk, ez extra pont a helyben maradásra
-CLUSTER_STICKINESS = 40
-
-# WORLD / SIM INICIALIZÁLÁS
+# ═══════════════════════════════════════
+# SZIMULÁCIÓ
+# ═══════════════════════════════════════
 
 Sim = RoverSimulationWorld(
     run_hrs=run_hrs,
@@ -87,68 +84,212 @@ Sim = RoverSimulationWorld(
     send_every=send_every,
 )
 
-# referenciák
-rover = Sim.rover
-sim = Sim.sim
+rover   = Sim.rover
+sim     = Sim.sim
 map_obj = Sim.sim.map_obj
-
-# Kezdő pozíció
 rover.pos = Vector2(0, 0)
 
+# ═══════════════════════════════════════
+# GEAR
+# ═══════════════════════════════════════
 
-# ENUM / GEAR SEGÉD
-def _enum_members(enum_cls):
-    #Biztonságos enum olvasás.Ha a GEARS enum __members__-t támogat, abból lekérjük a neveket.
-    
-    if hasattr(enum_cls, "__members__"):
-        return {k.upper(): v for k, v in enum_cls.__members__.items()}
-    return {}
+def _load_gears():
+    members = {}
+    if hasattr(GEARS, "__members__"):
+        members = {k.upper(): v for k, v in GEARS.__members__.items()}
+    result = {}
+    for speed, name in [(1, "SLOW"), (2, "NORMAL"), (3, "FAST")]:
+        g = members.get(name)
+        if g is None:
+            raise ValueError(f"GEARS enum hiányzik: {name}")
+        result[speed] = g
+    return result
 
+GEAR_BY_SPEED = _load_gears()
 
-# Beolvassuk a gear enum tagjait
-GEAR_MEMBERS = _enum_members(GEARS)
+def set_gear(speed):
+    rover.gear = GEAR_BY_SPEED[speed]
 
-# Sebesség -> gear megfeleltetés
-GEAR_BY_SPEED = {}
-for speed, name in [(1, "SLOW"), (2, "NORMAL"), (3, "FAST")]:
-    gear = GEAR_MEMBERS.get(name)
-    if gear is None:
-        raise ValueError(f"GEARS enum nem tartalmaz '{name}' tag-et.")
-    GEAR_BY_SPEED[speed] = gear
-
-
-# Sebesség -> gear megfeleltetés
-GEAR_BY_SPEED = {
-    1: GEAR_MEMBERS.get("SLOW"),
-    2: GEAR_MEMBERS.get("NORMAL"),
-    3: GEAR_MEMBERS.get("FAST")
-}
-
-
-def set_gear_by_speed(speed: int):
-    #A kívánt sebességhez beállítja a rover gear-jét.
-    
-    gear = GEAR_BY_SPEED.get(speed)
-
-    if gear is None:
-        raise ValueError(
-            f"Nincs GEARS enum hozzárendelve ehhez a speed-hez: {speed}. "
-            f"Ellenőrizd a GEARS enum neveit vagy GEAR_BY_SPEED dict-et."
-        )
-
-    rover.gear = gear
-
-
-def get_current_speed_value():
-    #A rover aktuális gear-jéből visszaadja a sebesség értékét (1,2,3).
-    
-    for speed, gear in GEAR_BY_SPEED.items():
-        if gear == rover.gear:
-            return speed
+def current_speed():
+    for s, g in GEAR_BY_SPEED.items():
+        if g == rover.gear:
+            return s
     return 2
 
+# ═══════════════════════════════════════
+# IDŐ
+# ═══════════════════════════════════════
 
-# BACKEND UPDATE
+def time_of_day():
+    for obj, attr in [(Sim, "time_of_day"), (sim, "time_of_day"), (map_obj, "time_of_day")]:
+        if hasattr(obj, attr):
+            return float(getattr(obj, attr))
+    return 0.0
+
+def elapsed_hrs():
+    for obj, attr in [(Sim, "elapsed_hrs"), (sim, "elapsed_hrs"),
+                      (Sim, "elapsed_hours"), (sim, "elapsed_hours")]:
+        if hasattr(obj, attr):
+            return float(getattr(obj, attr))
+    return 0.0
+
+def remaining_ticks():
+    return int(max(0.0, run_hrs - elapsed_hrs()) / delta_hrs)
+
+def is_day():
+    return (time_of_day() % 24.0) < 16.0
+
+def reserve():
+    return DAY_RESERVE if is_day() else NIGHT_RESERVE
+
+# ═══════════════════════════════════════
+# ENERGIAMODELL
+# ═══════════════════════════════════════
+
+def move_cost(speed):
+    """Bruttó fogyasztás 1 tickre: E = 2*v²"""
+    return float(ENERGY_K * speed * speed)
+
+def net_move(speed, day):
+    """
+    Nettó energiaváltozás mozgás közben 1 tickre.
+    Pozitív = merül, negatív = töltődik.
+    """
+    return move_cost(speed) - (DAY_CHARGE if day else 0)
+
+def net_mine(day):
+    return float(MINE_COST) - (DAY_CHARGE if day else 0)
+
+def ticks_needed(dist_blocks, speed):
+    return ceil(dist_blocks / speed)
+
+def battery_after(bat, dist_blocks, speed, day):
+    """Várható akkuszint az odaút + 1 tick bányászás után."""
+    t     = ticks_needed(dist_blocks, speed)
+    delta = net_move(speed, day) * t + net_mine(day)
+    return max(0.0, min(BATTERY_CAP, bat - delta))
+
+def energy_for_return(dist_to_base, day):
+    """
+    Mennyi akku kell a hazaúthoz.
+    Nappal: töltődik menet közben, elég a tartalék.
+    Éjjel: v=1, nettó +2/tick, konzervatív becslés.
+    """
+    if day:
+        return reserve()
+    t = ceil(dist_to_base * RETURN_MARGIN)
+    return 2.0 * t + reserve()
+
+def safe_to_go(bat, ore_dist, base_from_ore, speed, day):
+    """Igaz ha odaér + kibányász + visszaér."""
+    after  = battery_after(bat, ore_dist, speed, day)
+    needed = energy_for_return(base_from_ore, day)
+    return after >= needed
+
+# ═══════════════════════════════════════
+# PATH CACHE
+# ═══════════════════════════════════════
+
+_cache = {}
+
+def astar(start, goal):
+    key = (start, goal)
+    if key in _cache:
+        return _cache[key]
+    result = []
+    if CPP_AVAILABLE:
+        try:
+            result = cpp_mod.astar_from_csv(CSV_PATH, start, goal)
+        except Exception as e:
+            print("A* hiba:", e)
+    _cache[key] = result
+    return result
+
+def path_dist(start, goal):
+    if start == goal:
+        return 0
+    p = astar(start, goal)
+    return len(p) - 1 if p else None
+
+# ═══════════════════════════════════════
+# MAP
+# ═══════════════════════════════════════
+
+def get_all_ores():
+    ores = []
+    for y, row in enumerate(map_obj.map_data):
+        for x, tile in enumerate(row):
+            if tile in ORE_VALUES:
+                ores.append({"pos": (x, y), "type": tile})
+    return ores
+
+def remove_ore(ores, pos):
+    for i, o in enumerate(ores):
+        if o["pos"] == pos:
+            ores.pop(i)
+            return
+
+# ═══════════════════════════════════════
+# SEBESSÉGVÁLASZTÁS
+# ═══════════════════════════════════════
+
+def pick_speed(ore_dist, bat, base_dist, day):
+    """Legnagyobb biztonságos sebesség (3>2>1), vagy None."""
+    for speed in (3, 2, 1):
+        if safe_to_go(bat, ore_dist, base_dist, speed, day):
+            return speed
+    return None
+
+# ═══════════════════════════════════════
+# CÉLVÁLASZTÁS – LEGKÖZELEBBI ÉRC
+# ═══════════════════════════════════════
+
+def choose_ore(pos, ores, bat):
+    """
+    Greedy: a legkevesebb tickbe kerülő elérhető ércet választja.
+    Elérhető = van elég akku oda + bányász + vissza.
+    Nincs klaszter logika, nincs ugrálás.
+    """
+    day        = is_day()
+    best_ticks = None
+    best       = None
+
+    for ore in ores:
+        d_ore  = path_dist(pos, ore["pos"])
+        if d_ore is None:
+            continue
+
+        d_base = path_dist(ore["pos"], BASE_POS)
+        if d_base is None:
+            continue
+
+        speed = pick_speed(d_ore, bat, d_base, day)
+        if speed is None:
+            continue
+
+        t = ticks_needed(d_ore, speed)
+        if best_ticks is None or t < best_ticks:
+            best_ticks = t
+            best = {
+                "ore":   ore,
+                "path":  astar(pos, ore["pos"]),
+                "dist":  d_ore,
+                "ticks": t,
+                "speed": speed,
+                "after": battery_after(bat, d_ore, speed, day),
+            }
+
+    return best
+
+# ═══════════════════════════════════════
+# BACKEND
+# ═══════════════════════════════════════
+
+def refresh():
+    global rover, sim, map_obj
+    rover   = Sim.rover
+    sim     = Sim.sim
+    map_obj = Sim.sim.map_obj
 
 def send_setup():
     if not USE_SERVER:
@@ -158,748 +299,302 @@ def send_setup():
     except Exception as e:
         print("send_setup hiba:", e)
 
-def send_live_data(current_target=None, planned_path=None):
+def send_live(path_plan=None):
     if not USE_SERVER:
         return
-
     try:
-        # ─── Storage / Collected ores ───────────────────────────────
         storage = {"Y": 0, "G": 0, "B": 0}
-        
-        # Próbáljuk kitalálni, hol tárolja a rover az érceket
-        if hasattr(rover, "storage") and isinstance(rover.storage, dict):
-            storage = rover.storage
-        elif hasattr(rover, "inventory") and isinstance(rover.inventory, dict):
-            storage = rover.inventory
-        elif hasattr(rover, "mined_ores") and isinstance(rover.mined_ores, dict):
-            storage = rover.mined_ores
-        # Ha van pl. rover.collected_Y stb. → akkor kézzel kell összeszedni
+        for attr in ("storage", "inventory", "mined_ores"):
+            v = getattr(rover, attr, None)
+            if isinstance(v, dict):
+                storage = v
+                break
 
-        # ─── Energia fogyasztás / termelés (félóránkénti értékek) ───
-        consumption = 0.0
-        production  = 0.0
-
-        daytime = is_daytime()
-
+        day = is_day()
         if rover.status == STATUS.MINE:
-            consumption = MINING_CONSUMPTION
-        elif rover.status in (STATUS.MOVE, STATUS.IDLE):
-            speed = get_current_speed_value()
-            consumption = 2 * (speed ** 2)   # movement_consumption_per_half_hour
-        # standby = STANDBY_CONSUMPTION  (ha kell külön kezelni)
+            cons = MINE_COST
+        elif rover.status == STATUS.MOVE:
+            cons = move_cost(current_speed())
+        else:
+            cons = STANDBY_COST
+        prod = DAY_CHARGE if day else 0
 
-        if daytime:
-            production = DAY_CHARGE_PER_HALF_HOUR
-
-        # ─── rover_mined: az összes kibányászott koordináta ───
-        rover_mined = []
-        if hasattr(rover, "mined") and rover.mined:
-            rover_mined = rover.mined
+        raw_mined = getattr(rover, "mined", [])
+        if raw_mined and not isinstance(raw_mined[0], dict):
+            mined = [
+                {"x": int(m.x), "y": int(m.y)} if hasattr(m, "x")
+                else {"x": int(m[0]), "y": int(m[1])}
+                for m in raw_mined
+            ]
+        else:
+            mined = raw_mined
 
         payload = {
-            "time_of_day": float(get_time_of_day()),
-            "elapsed_hrs": float(get_elapsed_hours()),
-            "rover_position": {
-                "x": int(rover.pos.x),
-                "y": int(rover.pos.y)
-            },
-            "rover_battery": float(rover.battery),
-            "rover_storage": {
-                "B": int(storage.get("B", 0)),
-                "Y": int(storage.get("Y", 0)),
-                "G": int(storage.get("G", 0)),
-            },
-            "rover_speed": int(get_current_speed_value()),
+            "time_of_day":              float(time_of_day()),
+            "elapsed_hrs":              float(elapsed_hrs()),
+            "rover_position":           {"x": int(rover.pos.x), "y": int(rover.pos.y)},
+            "rover_battery":            float(rover.battery),
+            "rover_storage":            {k: int(storage.get(k, 0)) for k in ("B", "Y", "G")},
+            "rover_speed":              int(current_speed()),
             "rover_status": (
-                "mining" if rover.status == STATUS.MINE else
-                "idle" if rover.status == STATUS.IDLE else
-                "moving" if rover.status == STATUS.MOVE else
+                "mine" if rover.status == STATUS.MINE else
+                "move" if rover.status == STATUS.MOVE else
                 "dead" if rover.status == STATUS.DEAD else
-                "unknown"
+                "idle"
             ),
-            "rover_distance_travelled": float(getattr(rover, "distance_travelled", 0)),
-            "rover_path_plan": (
-                [{"x": int(x), "y": int(y)} for x, y in planned_path]
-                if planned_path is not None else []
-            ),
-            "current_target": (
-                {"x": int(current_target[0]), "y": int(current_target[1])}
-                if current_target else None
-            ),
-            # --- az új mezők, amiket a példa JSON-ban láttunk ---
-            "rover_energy_consumption": float(consumption),
-            "rover_energy_produce": float(production),
-            "rover_mined": rover_mined,
+            "rover_distance_travelled": int(getattr(rover, "distance_travelled", 0)),
+            "rover_path_plan":          path_plan or [],
+            "rover_energy_consumption": float(cons),
+            "rover_energy_produce":     float(prod),
+            "rover_mined":              mined,
         }
-
         logger.send_live(payload)
-
     except Exception as e:
-        print("send_live_data hiba:", type(e).__name__, str(e))
-#SEGÉDFÜGGVÉNYEK
+        print("send_live hiba:", type(e).__name__, e)
 
-def refresh_refs():
-    #A sim tickek után frissítjük a rover / sim / map objektum referenciákat.
-    
-    global rover, sim, map_obj
-    rover = Sim.rover
-    sim = Sim.sim
-    map_obj = Sim.sim.map_obj
-
-
-def get_time_of_day():
-    #Több helyről is megpróbáljuk kiolvasni az aktuális napszak időértékét.
-    
-    for obj, attr in [
-        (Sim, "time_of_day"),
-        (sim, "time_of_day"),
-        (map_obj, "time_of_day"),
-    ]:
-        if hasattr(obj, attr):
-            return float(getattr(obj, attr))
-    return 0.0
-
-
-def get_elapsed_hours():
-    
-    #Eddig eltelt órák lekérése, ha van ilyen attribútum.
-    
-    for obj, attr in [
-        (Sim, "elapsed_hrs"),
-        (sim, "elapsed_hrs"),
-        (Sim, "elapsed_hours"),
-        (sim, "elapsed_hours"),
-    ]:
-        if hasattr(obj, attr):
-            return float(getattr(obj, attr))
-    return 0.0
-
-
-def is_daytime():
-    """
-    A kiírás:
-        - nappal = 16 óra
-        - éjszaka = 8 óra
-
-    Tehát 24 órás cikluson belül:
-        0-16 -- nappal
-        16-24 -- éjszaka
-    """
-    tod = get_time_of_day() % 24.0
-    return tod < 16.0
-
-
-def same_pos_vec_and_tuple(vec, xy):
-    #Vector2 és (x,y) tuple összehasonlítása.
-    return vec.x == xy[0] and vec.y == xy[1]
-
-# ENERGIA SZÁMÍTÁSOK
-
-def movement_consumption_per_half_hour(speed: int):
-    #Mozgási fogyasztás félórára: E = k * v^2, ahol k=2
-    
-    return 2 * (speed ** 2)
-
-
-def net_move_energy_per_half_hour(speed: int, daytime: bool):
-    """
-
-    Félóránkénti nettó energiamérleg mozgás közben.
-    Nappal: fogyasztás - töltés
-    Éjjel: fogyasztás - 0
-    Pozitív: merül
-    Negatív: töltődik összességében
-
-    """
-    use = movement_consumption_per_half_hour(speed)
-    charge = DAY_CHARGE_PER_HALF_HOUR if daytime else 0
-    return use - charge
-
-
-def net_mine_energy_per_half_hour(daytime: bool):
-    """
-
-    Bányászás közbeni nettó energiamérleg félórára.
-    Bányászás közben a rover áll, de 2 egységet fogyaszt.
-    Nappal mozgás közben is tölthet.
-    
-    """
-    charge = DAY_CHARGE_PER_HALF_HOUR if daytime else 0
-    return MINING_CONSUMPTION - charge
-
-
-def estimate_move_half_hours(dist_blocks: int, speed: int):
-    """
-
-    Megadja, hogy hány félórás tick kell dist blokk megtételéhez.
-
-    """
-    return ceil(dist_blocks / speed)
-
-
-def estimate_trip_after_battery(current_battery: float, dist_blocks: int, speed: int, daytime: bool):
-    """
-
-    Megbecsüli, mennyi akku maradna:
-    - odamenetel után
-    - majd 1 bányászás tick után
-
-    Visszaad:
-    - várható akku
-    - mozgáshoz szükséges félórás tickek száma
-
-    """
-    move_ticks = estimate_move_half_hours(dist_blocks, speed)
-    move_delta = net_move_energy_per_half_hour(speed, daytime) * move_ticks
-    mine_delta = net_mine_energy_per_half_hour(daytime) * 1  # 1 tick = 0.5 óra bányászás
-
-    after = current_battery - move_delta - mine_delta
-
-    # Akku nem mehet 0 alá vagy 100 fölé
-    after = max(0, min(BATTERY_CAP, after))
-
-    return after, move_ticks
-
-
-# MAP / ÉRC SEGÉDEK
-
-def get_all_ores():
-    #Végigmegy a mapon, és összeszedi az összes elérhető ércet.
-    
-    ores = []
-    data = map_obj.map_data
-
-    for y in range(len(data)):
-        for x in range(len(data[y])):
-            tile = data[y][x]
-
-            if tile in ORE_VALUES:
-                ores.append({
-                    "pos": (x, y),
-                    "type": tile,
-                    "value": ORE_VALUES[tile]
-                })
-
-    return ores
-
-
-def remove_mined_ore(ores, pos_xy):
-    #Kiveszi a kibányászott ércet az aktív ore listából.
-    for i, ore in enumerate(ores):
-        if ore["pos"] == pos_xy:
-            ores.pop(i)
-            return True
-    return False
-
-# C++ A* KAPCSOLAT
-
-def get_cpp_path(start_xy, goal_xy):
-    #Meghívja a C++ A* útkeresőt.
-    
-    if not CPP_AVAILABLE:
-        print("C++ A* nem elérhető, üres path visszaadása")
-        return []
-    
-    try:
-        return cpp_mod.astar_from_csv(CSV_PATH, start_xy, goal_xy)
-    except Exception as e:
-        print("C++ A* hiba:", e)
-        return []
-
-
-def get_path_and_length(start_xy, goal_xy):
-    """
-    Visszaadja:
-    - teljes path-et
-    - távolság blokkban
-
-    Ha nincs útvonal, dist=None
-    """
-    path = get_cpp_path(start_xy, goal_xy)
-
-    if not path:
-        print(f"Nincs útvonal {start_xy} -> {goal_xy}")
-        return [], None
-
-    return path, len(path) - 1
-
-# KLASZTER LOGIKA
-
-def cluster_bonus(target_ore, ores, radius=CLUSTER_RADIUS):
-    """
-    Megnézi, hogy a target körül hány másik érc van a megadott sugáron belül.
-
-    Mivel diagonális mozgás is engedett,
-    itt Chebyshev-távolságot használunk:
-    max(dx, dy)
-    """
-    tx, ty = target_ore["pos"]
-    bonus = 0
-
-    for ore in ores:
-        if ore["pos"] == target_ore["pos"]:
-            continue
-
-        ox, oy = ore["pos"]
-        chebyshev = max(abs(tx - ox), abs(ty - oy))
-
-        if chebyshev <= radius:
-            bonus += 1
-
-    return bonus
-
-
-def ores_near_anchor(ores, anchor_xy, radius=CLUSTER_RADIUS):
-    #Visszaadja az anchor körüli érceket.
-    
-    if anchor_xy is None:
-        return []
-
-    ax, ay = anchor_xy
-    result = []
-
-    for ore in ores:
-        ox, oy = ore["pos"]
-        chebyshev = max(abs(ax - ox), abs(ay - oy))
-
-        if chebyshev <= radius:
-            result.append(ore)
-
-    return result
-
-
-def should_keep_local_harvest(ores, cluster_center):
-    #Addig maradunk a klaszterben, amíg a cluster_center körül van még legalább 1 érc.
-    
-    if cluster_center is None:
-        return False
-
-    local_ores = ores_near_anchor(ores, cluster_center, radius=CLUSTER_RADIUS)
-    return len(local_ores) > 0
-
-# SEBESSÉGVÁLASZTÁS
-
-def choose_speed_for_target(dist, battery, daytime):
-    """
-    Kiválasztja a legjobb sebességet az adott célponthoz.
-
-    Alapelv:
-    - nappal inkább normál
-    - ha nagyon tele az akku és hosszú az út, gyors is lehet
-    - éjjel inkább lassú, mert jobb az energia/blokk arány
-    """
-    candidates = [1, 2, 3]
-    best = None
-
-    for speed in candidates:
-        after_battery, move_ticks = estimate_trip_after_battery(
-            battery,
-            dist,
-            speed,
-            daytime
-        )
-
-        # Mennyi minimális tartalék maradjon
-        reserve = MIN_EMERGENCY_BATTERY if daytime else NIGHT_RESERVE
-
-        # Ha ez a sebesség túl veszélyes, eldobjuk
-        if after_battery < reserve:
-            continue
-
-        # Heurisztikus pontozás
-        utility = 0
-
-        # Maradjon sok akku
-        utility += after_battery * 0.8
-
-        # Minél kevesebb idő kelljen
-        utility -= move_ticks * 3.0
-
-        # Nappali preferencia
-        if daytime:
-            if speed == 2:
-                utility += 8
-            elif speed == 3 and battery >= 85 and dist >= 10:
-                utility += 5
-        else:
-            # Éjszakai preferencia
-            if speed == 1:
-                utility += 10
-            elif speed == 2 and battery >= 70 and dist <= 5:
-                utility += 2
-
-        if best is None or utility > best["utility"]:
-            best = {
-                "speed": speed,
-                "after_battery": after_battery,
-                "move_ticks": move_ticks,
-                "utility": utility
-            }
-
-    return best
-
-
-
-# CÉLVÁLASZTÁS - GLOBÁLIS
-
-def choose_next_ore(current_pos_xy, ores, current_battery, cluster_anchor=None):
-    """
-    Globális célválasztás:
-    az összes érc közül kiválasztja a legjobb következő célt.
-
-    Figyelembe veszi:
-    - távolság
-    - klaszter sűrűség
-    - várható maradék akku
-    - menetidő
-    - helyben maradás bónusza (ha lenne cluster_anchor)
-    """
-    daytime = is_daytime()
-    candidates = []
-
-    local_ores = ores_near_anchor(ores, cluster_anchor, radius=CLUSTER_RADIUS) if cluster_anchor else []
-
-    for ore in ores:
-        path, dist = get_path_and_length(current_pos_xy, ore["pos"])
-
-        # Ha nincs elérhető út, ezt kihagyjuk
-        if dist is None:
-            continue
-
-        speed_plan = choose_speed_for_target(dist, current_battery, daytime)
-
-        # Ha egyik sebességgel sem biztonságos, kihagyjuk
-        if speed_plan is None:
-            continue
-
-        local_bonus = cluster_bonus(ore, ores, radius=CLUSTER_RADIUS)
-
-        staying_bonus = 0
-        if cluster_anchor is not None and ore in local_ores:
-            staying_bonus = CLUSTER_STICKINESS
-
-        # Összpontszám
-        score = 0
-        score += ore["value"] * 100
-        score += local_bonus * DENSE_CLUSTER_BONUS
-        score += staying_bonus
-        score += speed_plan["after_battery"] * 0.6
-        score -= dist * 3.5
-        score -= speed_plan["move_ticks"] * 4.0
-
-        candidates.append({
-            "ore": ore,
-            "path": path,
-            "dist": dist,
-            "score": score,
-            "cluster_bonus": local_bonus,
-            "speed": speed_plan["speed"],
-            "after_battery": speed_plan["after_battery"],
-            "move_ticks": speed_plan["move_ticks"],
-        })
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda c: c["score"], reverse=True)
-    return candidates[0]
-
-# CÉLVÁLASZTÁS - HELYI KLASZTEREN BELÜL
-
-def choose_best_local_ore(current_pos_xy, local_ores, current_battery):
-    """
-    Ha már egy klaszterben vagyunk, akkor csak a helyi ércek közül választ.
-
-    Ez a kulcs ahhoz, hogy ne menjen el 3-4 kő után máshova.
-    """
-    daytime = is_daytime()
-    candidates = []
-
-    for ore in local_ores:
-        path, dist = get_path_and_length(current_pos_xy, ore["pos"])
-
-        if dist is None:
-            continue
-
-        speed_plan = choose_speed_for_target(dist, current_battery, daytime)
-
-        if speed_plan is None:
-            continue
-
-        local_bonus = cluster_bonus(ore, local_ores, radius=CLUSTER_RADIUS)
-
-        score = 0
-        score += ore["value"] * 100
-        score += local_bonus * DENSE_CLUSTER_BONUS
-        score += speed_plan["after_battery"] * 0.6
-        score -= dist * 3.0
-        score -= speed_plan["move_ticks"] * 3.0
-
-        candidates.append({
-            "ore": ore,
-            "path": path,
-            "dist": dist,
-            "score": score,
-            "cluster_bonus": local_bonus,
-            "speed": speed_plan["speed"],
-            "after_battery": speed_plan["after_battery"],
-            "move_ticks": speed_plan["move_ticks"],
-        })
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda c: c["score"], reverse=True)
-    return candidates[0]
-
-
+# ═══════════════════════════════════════
 # WORLD STEP
+# ═══════════════════════════════════════
 
-def world_step(current_target=None, planned_path=None):
-    """
-    Egy szimulációs lépés:
-    - ref frissítés
-    - sim step
-    - ref frissítés
-    - live adatküldés
-    """
-    refresh_refs()
+def world_step(path_plan=None):
+    refresh()
     Sim.step(sleep=True)
-    refresh_refs()
-    send_live_data(current_target=current_target, planned_path=planned_path)
+    refresh()
+    send_live(path_plan)
 
+# ═══════════════════════════════════════
+# MOZGÁS
+# ═══════════════════════════════════════
 
+def move_to(target, path, speed):
+    """
+    Kézzel lépteti végig a path-t, tickenként pontosan 'speed' blokkot haladva.
 
-# MOZGÁS A CÉLHOZ
+    A feladatleírás szerint v=2 azt jelenti: 1 tick alatt 2 blokk.
+    Ezért a path-t 'speed' méretű szeletekre vágjuk, és minden szelet
+    VÉGPONTJÁRA hívjuk a path_find_to-t, majd 1 tick-et lépünk.
 
-def move_rover_to(target_xy, planned_path, speed):
-    #A rovert elmozgatja a megadott célpozícióig.
-    
-    set_gear_by_speed(speed)
+    Így garantált hogy:
+      - 1 tick alatt pontosan 'speed' blokk (vagy kevesebb az utolsó ticknél)
+      - Nem ugrik át blokkokat
+      - Az energiafogyasztás pontosan stimmel
+    """
+    plan = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
 
-    target_vec = Vector2(target_xy[0], target_xy[1])
+    # A path az A*-tól jön: path[0] = start, path[-1] = cél
+    # Lépjük végig 'speed' lépésenként
+    remaining = list(path)
 
-    # A beépített pathfindingnak megadjuk a célpontot
-    rover.path_find_to(target_vec)
+    # Levágjuk a start pozíciót ha az egyenlő a rover pozíciójával
+    if remaining and (remaining[0][0], remaining[0][1]) == (rover.pos.x, rover.pos.y):
+        remaining = remaining[1:]
 
-    max_steps = 5000
-    stuck_steps = 0
-    last_pos = (rover.pos.x, rover.pos.y)
+    timeout = 5000
 
-    while not same_pos_vec_and_tuple(rover.pos, target_xy):
-        # Tick előtt újra beállítjuk a geart
-        set_gear_by_speed(speed)
+    while remaining:
+        # Következő tick célpontja: 'speed' lépéssel arrébb, vagy a path vége
+        step_end = remaining[min(speed, len(remaining)) - 1]
+        step_target = (step_end[0], step_end[1])
 
-        world_step(current_target=target_xy, planned_path=planned_path)
+        set_gear(speed)
+        rover.path_find_to(Vector2(step_target[0], step_target[1]))
+        world_step(plan)
 
-        current_pos = (rover.pos.x, rover.pos.y)
-
-        # Akku vész eset
         if rover.battery <= 0:
-            print("Lemerült mozgás közben.")
+            print("Lemerult mozgas kozben.")
             return False
 
-        # Beragadás figyelés
-        if current_pos == last_pos:
-            stuck_steps += 1
-        else:
-            stuck_steps = 0
+        # Levágjuk a már megtett lépéseket
+        rover_pos = (rover.pos.x, rover.pos.y)
+        while remaining and (remaining[0][0], remaining[0][1]) == rover_pos:
+            remaining = remaining[1:]
+        # Ha a rover tovább lépett (speed > 1), vágjuk le a közbülső pontokat is
+        if remaining:
+            # megkeressük hol tartunk a path-ban
+            idx = None
+            for i, p in enumerate(remaining):
+                if (p[0], p[1]) == rover_pos:
+                    idx = i
+                    break
+            if idx is not None:
+                remaining = remaining[idx + 1:]
 
-        last_pos = current_pos
-
-        if stuck_steps >= 20:
-            print("A rover nem halad tovább.")
+        timeout -= 1
+        if timeout <= 0:
+            print("Mozgas timeout.")
             return False
 
-        max_steps -= 1
-        if max_steps <= 0:
-            print("Mozgás timeout.")
-            return False
+    # Végső ellenőrzés
+    if rover.pos.x != target[0] or rover.pos.y != target[1]:
+        # Lehet hogy egy lépéssel túlment – egy utolsó path_find_to a célra
+        rover.path_find_to(Vector2(target[0], target[1]))
+        world_step(plan)
 
     return True
 
+# ═══════════════════════════════════════
 # BÁNYÁSZÁS
+# ═══════════════════════════════════════
 
-def mine_current_tile(target_xy, planned_path):
-    """
-    Elindítja a bányászás folyamatát és kivárja a végét.
-    """
+def mine_here(target, path):
+    plan    = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
     rover.mine()
 
-    max_steps = 5000
-    stuck_steps = 0
-    initial_steps = 0
-    last_status = rover.status
+    stuck   = 0
+    last_st = rover.status
+    waited  = 0
+    timeout = 5000
 
     while rover.status == STATUS.MINE:
-        world_step(current_target=target_xy, planned_path=planned_path)
+        world_step(plan)
 
         if rover.battery <= 0:
-            print("Lemerült bányászás közben.")
+            print("Lemerult banyaszas kozben.")
             return False
 
-        initial_steps += 1
+        waited += 1
+        if waited > 3:
+            stuck = stuck + 1 if rover.status == last_st else 0
+        last_st = rover.status
 
-        # Beragadás figyelés status alapján, de csak kezdeti lépések után
-        if initial_steps > 3:
-            if rover.status == last_status:
-                stuck_steps += 1
-            else:
-                stuck_steps = 0
-
-        last_status = rover.status
-
-        if stuck_steps >= 20:
-            print("A bányászás nem halad tovább.")
+        if stuck >= 20:
+            print("Banyaszas beragadt.")
             return False
 
-        max_steps -= 1
-        if max_steps <= 0:
-            print("Bányászás timeout.")
+        timeout -= 1
+        if timeout <= 0:
+            print("Banyaszas timeout.")
             return False
 
     return True
 
-# EGY TELJES CÉL KIBÁNYÁSZÁSA
+# ═══════════════════════════════════════
+# VISSZATÉRÉS
+# ═══════════════════════════════════════
 
-def mine_one_target(ores, target_pack):
-    """
-    Egy kiválasztott célra:
-    - odamegy
-    - kibányássza
-    - törli az ore listából
-    - kitörli a mapból
-    """
-    target_ore = target_pack["ore"]
-    target_xy = target_ore["pos"]
-    planned_path = target_pack["path"]
-    speed = target_pack["speed"]
+def go_home(reason=""):
+    print(f"Hazafele ({reason})...")
+    pos = (rover.pos.x, rover.pos.y)
 
-    print(
-        f"Cél: {target_xy}, "
-        f"típus: {target_ore['type']}, "
-        f"dist: {target_pack['dist']}, "
-        f"speed: {speed}, "
-        f"cluster_bonus: {target_pack['cluster_bonus']}, "
-        f"várható_akku_utána: {target_pack['after_battery']:.1f}, "
-        f"day={is_daytime()}"
-    )
+    if pos != BASE_POS:
+        p = astar(pos, BASE_POS)
+        if not p:
+            print("Nincs ut haza!")
+            return False
+        d     = len(p) - 1
+        speed = pick_speed(d, rover.battery, 0, is_day()) or 1
+        if not move_to(BASE_POS, p, speed):
+            return False
 
-    send_live_data(current_target=target_xy, planned_path=planned_path)
+    waited = 0
+    while rover.battery < 80 and waited < 400:
+        world_step([])
+        waited += 1
 
-    # mozgas
-    ok_move = move_rover_to(target_xy, planned_path, speed)
-    if not ok_move:
-        return False, None
+    print(f"Otthon, akku: {rover.battery:.1f}")
+    return True
 
-    # bányászás
-    ok_mine = mine_current_tile(target_xy, planned_path)
-    if not ok_mine:
-        return False, None
+def must_go_home(pos, bat):
+    d = path_dist(pos, BASE_POS)
+    if d is None:
+        return False
+    if remaining_ticks() <= END_TICKS:
+        return True
+    needed = energy_for_return(d, is_day())
+    if bat <= needed:
+        print(f"Alacsony akku ({bat:.1f} <= {needed:.1f}), hazafele")
+        return True
+    return False
 
-    # Set last_mined for logging
-    rover.last_mined = Vector2(target_xy[0], target_xy[1])
-
-    # kiveszük a kibányászot ércet
-    removed = remove_mined_ore(ores, target_xy)
-    if removed:
-        print(f"Kibányászva: {target_xy}")
-    else:
-        print("Nem sikerült törölni a kibányászott ércet:", target_xy)
-
-    return True, target_xy
-
+# ═══════════════════════════════════════
+# FŐPROGRAM
+# ═══════════════════════════════════════
 
 def main():
-    """
-    Fő vezérlő ciklus.
-    """
-    refresh_refs()
-
-    # Összes érc összegyűjtése induláskor
+    refresh()
     ores = get_all_ores()
 
-    print("Talált ércek száma:", len(ores))
-    print("Kezdő pozíció:", rover.pos.x, rover.pos.y)
+    print(f"Ercek: {len(ores)}  |  {run_hrs}h = {int(run_hrs/delta_hrs)} tick")
+    print("Energiamodell (1 tick = 0.5 ora):")
+    for v in (1, 2, 3):
+        print(f"  v={v}: {move_cost(v):.0f}/tick brutto | "
+              f"nappal {net_move(v,True):+.0f} | "
+              f"ejjel {net_move(v,False):+.0f}")
+    print()
 
     send_setup()
-    send_live_data(current_target=None, planned_path=[])
+    send_live()
 
-    mined_count = 0
-
-    # Ez a fix klaszterközép. Ha egyszer kiválasztunk egy jó területet,addig ott maradunk, amíg a környékén van még érc.
-    cluster_center = None
+    mined     = 0
+    went_home = False
 
     while rover.battery > 0 and ores:
-        current_pos = (rover.pos.x, rover.pos.y)
+        pos = (rover.pos.x, rover.pos.y)
 
-        #  Ha van aktív klaszter, és abban még van érc, akkor CSAK abból válasszunk
+        if must_go_home(pos, rover.battery):
+            go_home("akku / idolimit")
+            if remaining_ticks() <= END_TICKS:
+                went_home = True
+                break
+            continue
 
-        if should_keep_local_harvest(ores, cluster_center):
-            local_ores = ores_near_anchor(
-                ores,
-                cluster_center,
-                radius=CLUSTER_RADIUS
-            )
+        target = choose_ore(pos, ores, rover.battery)
 
-            best = choose_best_local_ore(
-                current_pos_xy=current_pos,
-                local_ores=local_ores,
-                current_battery=rover.battery
-            )
-
-
-        # Ha nincs aktív klaszter, válasszunk globálisan
-
-        else:
-            cluster_center = None
-
-            best = choose_next_ore(
-                current_pos_xy=current_pos,
-                ores=ores,
-                current_battery=rover.battery,
-                cluster_anchor=None
-            )
-
-        # Ha nincs több biztonságos cél
-        if best is None:
-            print("Nincs több elérhető vagy energiaszinten biztonságosan elérhető érc.")
+        if target is None:
+            if not is_day():
+                world_step([])
+                continue
+            print("Nincs elheto erc.")
             break
 
-        #  Ha most globálból választottunk új célt,ezt tekintjük az új klaszter közepének
-
-        if cluster_center is None:
-            cluster_center = best["ore"]["pos"]
-
-        #Kibányásszuk a kiválasztott célt
-        ok, mined_xy = mine_one_target(ores, best)
-        if not ok:
-            break
-
-        mined_count += 1
-
-
-        #Ha kiürült a klaszter, elengedjük
-        if not should_keep_local_harvest(ores, cluster_center):
-            cluster_center = None
-
+        ore = target["ore"]
         print(
-            f"Összesen kibányászva: {mined_count} | "
-            f"Maradék akku: {rover.battery:.1f} | "
-            f"Megmaradt ércek: {len(ores)} | "
-            f"Nappal: {is_daytime()}"
+            f"-> {ore['pos']} ({ore['type']}) | "
+            f"dist={target['dist']} ticks={target['ticks']} "
+            f"speed={target['speed']} | "
+            f"bat: {rover.battery:.1f}->{target['after']:.1f} | "
+            f"{'nap' if is_day() else 'ej'}"
         )
 
-    print("Vége.")
-    print("Maradék battery:", rover.battery)
-    print("Kibányászott ércek:", mined_count)
-    print("Megmaradt ércek:", len(ores))
+        if not move_to(ore["pos"], target["path"], target["speed"]):
+            break
+
+        if not mine_here(ore["pos"], target["path"]):
+            break
+
+        rover.last_mined = Vector2(ore["pos"][0], ore["pos"][1])
+        remove_ore(ores, ore["pos"])
+        mined += 1
+
+        print(f"[{mined}] akku={rover.battery:.1f} maradt={len(ores)} {'nap' if is_day() else 'ej'}")
+
+    if not went_home:
+        if (rover.pos.x, rover.pos.y) != BASE_POS:
+            go_home("szimulaio vege")
+
+    storage = {"Y": 0, "G": 0, "B": 0}
+    for attr in ("storage", "inventory", "mined_ores"):
+        v = getattr(rover, attr, None)
+        if isinstance(v, dict):
+            storage = v
+            break
+
+    print("\n" + "=" * 50)
+    print("SZIMULAIO VEGE")
+    print("=" * 50)
+    print(f"Kibanyaszott : {mined}  (B={storage.get('B',0)} Y={storage.get('Y',0)} G={storage.get('G',0)})")
+    print(f"Megmaradt    : {len(ores)} erc")
+    print(f"Vegso akku   : {rover.battery:.1f}")
+    print(f"Eltelt       : {elapsed_hrs():.1f} h")
+    print(f"Cache        : {len(_cache)} bejegyzes")
+    pos = (rover.pos.x, rover.pos.y)
+    print(f"Bazis        : {'OK' if pos == BASE_POS else 'NEM OK'} {pos}")
+    print("=" * 50)
 
     try:
         Sim.close()
     except Exception:
         pass
-
     try:
         logger.close()
     except Exception:
