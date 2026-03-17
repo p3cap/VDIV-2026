@@ -212,7 +212,6 @@ class Rover:
 	def mine_finished(self):
 		tile_mark = self.sim.map_obj.get_tile(self.pos)
 		self.status = STATUS.IDLE
-		self.sim.map_obj.set_tile(self.pos, self.sim.map_obj.path_marker)
 		self.mined.append(self.pos._dict())
 		self.storage[tile_mark] += 1
 

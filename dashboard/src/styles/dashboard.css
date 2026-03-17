@@ -190,8 +190,8 @@
   border: var(--border-subtle);
   border-radius: var(--r-md);
   padding: var(--sp-4);
-  min-width: 0;
-  animation: fadeUp 0.45s both;
+  min-width: 300px;
+  animation: fadeUp 0.6s both;
   transition:
     border-color var(--t-mid),
     box-shadow var(--t-mid),

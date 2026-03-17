@@ -1,13 +1,23 @@
 from math import ceil
-import requests
 
 from Simulation_env import RoverSimulationWorld
 from RoverClass import STATUS, GEARS
 from Global import Vector2
-import cpp_path as cpp_mod
+from RoverLogger import RoverLogger
+
+# Optional C++ backend for A* (pybind11 module). Imported once at module level.
+try:
+    import cpp_path as cpp_mod
+    CPP_AVAILABLE = True
+except Exception:
+    cpp_mod = None
+    CPP_AVAILABLE = False
 
 # base url
 BASE_URL = "http://127.0.0.1:8000"
+
+# Initialize RoverLogger
+logger = RoverLogger(BASE_URL)
 
 # A térkép beolv
 CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
@@ -48,7 +58,7 @@ BATTERY_CAP = 100
 MIN_EMERGENCY_BATTERY = 6
 
 # Éjjel nagyobb tartalékot hagyunk, mert nincs töltés
-NIGHT_RESERVE = 18
+NIGHT_RESERVE = 12
 
 # KLASZTER / HELYI KITERMELÉS PARAMÉTEREK
 
@@ -99,6 +109,15 @@ def _enum_members(enum_cls):
 GEAR_MEMBERS = _enum_members(GEARS)
 
 # Sebesség -> gear megfeleltetés
+GEAR_BY_SPEED = {}
+for speed, name in [(1, "SLOW"), (2, "NORMAL"), (3, "FAST")]:
+    gear = GEAR_MEMBERS.get(name)
+    if gear is None:
+        raise ValueError(f"GEARS enum nem tartalmaz '{name}' tag-et.")
+    GEAR_BY_SPEED[speed] = gear
+
+
+# Sebesség -> gear megfeleltetés
 GEAR_BY_SPEED = {
     1: GEAR_MEMBERS.get("SLOW"),
     2: GEAR_MEMBERS.get("NORMAL"),
@@ -114,7 +133,7 @@ def set_gear_by_speed(speed: int):
     if gear is None:
         raise ValueError(
             f"Nincs GEARS enum hozzárendelve ehhez a speed-hez: {speed}. "
-            f"Ellenőrizd a GEARS enum neveit."
+            f"Ellenőrizd a GEARS enum neveit vagy GEAR_BY_SPEED dict-et."
         )
 
     rover.gear = gear
@@ -132,56 +151,91 @@ def get_current_speed_value():
 # BACKEND UPDATE
 
 def send_setup():
-    
-    #Egyszer elküldjük a map állapotát a backendnek.
-    
     if not USE_SERVER:
         return
-
     try:
-        requests.post(
-            f"{BASE_URL}/send_setup",
-            json={"map_matrix": map_obj.map_data},
-            timeout=2,
-        )
+        logger.send_setup({"map_matrix": map_obj.map_data})
     except Exception as e:
         print("send_setup hiba:", e)
 
-
 def send_live_data(current_target=None, planned_path=None):
-    #Élő adatküldés a backend felé.Itt mennek a rover állapotok, akku, útvonal stb.
-    
     if not USE_SERVER:
         return
 
     try:
+        # ─── Storage / Collected ores ───────────────────────────────
+        storage = {"Y": 0, "G": 0, "B": 0}
+        
+        # Próbáljuk kitalálni, hol tárolja a rover az érceket
+        if hasattr(rover, "storage") and isinstance(rover.storage, dict):
+            storage = rover.storage
+        elif hasattr(rover, "inventory") and isinstance(rover.inventory, dict):
+            storage = rover.inventory
+        elif hasattr(rover, "mined_ores") and isinstance(rover.mined_ores, dict):
+            storage = rover.mined_ores
+        # Ha van pl. rover.collected_Y stb. → akkor kézzel kell összeszedni
+
+        # ─── Energia fogyasztás / termelés (félóránkénti értékek) ───
+        consumption = 0.0
+        production  = 0.0
+
+        daytime = is_daytime()
+
+        if rover.status == STATUS.MINE:
+            consumption = MINING_CONSUMPTION
+        elif rover.status in (STATUS.MOVE, STATUS.IDLE):
+            speed = get_current_speed_value()
+            consumption = 2 * (speed ** 2)   # movement_consumption_per_half_hour
+        # standby = STANDBY_CONSUMPTION  (ha kell külön kezelni)
+
+        if daytime:
+            production = DAY_CHARGE_PER_HALF_HOUR
+
+        # ─── rover_mined: az összes kibányászott koordináta ───
+        rover_mined = []
+        if hasattr(rover, "mined") and rover.mined:
+            rover_mined = rover.mined
+
         payload = {
-            "time_of_day": get_time_of_day(),
-            "elapsed_hrs": get_elapsed_hours(),
-            "rover_position": {"x": rover.pos.x, "y": rover.pos.y},
-            "rover_battery": rover.battery,
-            "rover_speed": get_current_speed_value(),
-            "rover_status": str(rover.status),
-            "rover_distance_travelled": getattr(rover, "distance_travelled", 0),
+            "time_of_day": float(get_time_of_day()),
+            "elapsed_hrs": float(get_elapsed_hours()),
+            "rover_position": {
+                "x": int(rover.pos.x),
+                "y": int(rover.pos.y)
+            },
+            "rover_battery": float(rover.battery),
+            "rover_storage": {
+                "B": int(storage.get("B", 0)),
+                "Y": int(storage.get("Y", 0)),
+                "G": int(storage.get("G", 0)),
+            },
+            "rover_speed": int(get_current_speed_value()),
+            "rover_status": (
+                "mining" if rover.status == STATUS.MINE else
+                "idle" if rover.status == STATUS.IDLE else
+                "moving" if rover.status == STATUS.MOVE else
+                "dead" if rover.status == STATUS.DEAD else
+                "unknown"
+            ),
+            "rover_distance_travelled": float(getattr(rover, "distance_travelled", 0)),
             "rover_path_plan": (
-                [{"x": x, "y": y} for x, y in planned_path]
+                [{"x": int(x), "y": int(y)} for x, y in planned_path]
                 if planned_path is not None else []
             ),
             "current_target": (
-                {"x": current_target[0], "y": current_target[1]}
+                {"x": int(current_target[0]), "y": int(current_target[1])}
                 if current_target else None
             ),
+            # --- az új mezők, amiket a példa JSON-ban láttunk ---
+            "rover_energy_consumption": float(consumption),
+            "rover_energy_produce": float(production),
+            "rover_mined": rover_mined,
         }
 
-        requests.post(
-            f"{BASE_URL}/send_data",
-            json=payload,
-            timeout=2,
-        )
+        logger.send_live(payload)
+
     except Exception as e:
-        print("send_data hiba:", e)
-
-
+        print("send_live_data hiba:", type(e).__name__, str(e))
 #SEGÉDFÜGGVÉNYEK
 
 def refresh_refs():
@@ -301,9 +355,8 @@ def estimate_trip_after_battery(current_battery: float, dist_blocks: int, speed:
 
     after = current_battery - move_delta - mine_delta
 
-    # Nappal ha töltődik, ne mehessen 100 fölé
-    if daytime:
-        after = min(BATTERY_CAP, after)
+    # Akku nem mehet 0 alá vagy 100 fölé
+    after = max(0, min(BATTERY_CAP, after))
 
     return after, move_ticks
 
@@ -343,6 +396,10 @@ def remove_mined_ore(ores, pos_xy):
 def get_cpp_path(start_xy, goal_xy):
     #Meghívja a C++ A* útkeresőt.
     
+    if not CPP_AVAILABLE:
+        print("C++ A* nem elérhető, üres path visszaadása")
+        return []
+    
     try:
         return cpp_mod.astar_from_csv(CSV_PATH, start_xy, goal_xy)
     except Exception as e:
@@ -361,6 +418,7 @@ def get_path_and_length(start_xy, goal_xy):
     path = get_cpp_path(start_xy, goal_xy)
 
     if not path:
+        print(f"Nincs útvonal {start_xy} -> {goal_xy}")
         return [], None
 
     return path, len(path) - 1
@@ -649,7 +707,7 @@ def move_rover_to(target_xy, planned_path, speed):
 
         last_pos = current_pos
 
-        if stuck_steps >= 80:
+        if stuck_steps >= 20:
             print("A rover nem halad tovább.")
             return False
 
@@ -670,6 +728,7 @@ def mine_current_tile(target_xy, planned_path):
 
     max_steps = 5000
     stuck_steps = 0
+    initial_steps = 0
     last_status = rover.status
 
     while rover.status == STATUS.MINE:
@@ -679,15 +738,18 @@ def mine_current_tile(target_xy, planned_path):
             print("Lemerült bányászás közben.")
             return False
 
-        # Beragadás figyelés status alapján
-        if rover.status == last_status:
-            stuck_steps += 1
-        else:
-            stuck_steps = 0
+        initial_steps += 1
+
+        # Beragadás figyelés status alapján, de csak kezdeti lépések után
+        if initial_steps > 3:
+            if rover.status == last_status:
+                stuck_steps += 1
+            else:
+                stuck_steps = 0
 
         last_status = rover.status
 
-        if stuck_steps >= 80:
+        if stuck_steps >= 20:
             print("A bányászás nem halad tovább.")
             return False
 
@@ -735,20 +797,15 @@ def mine_one_target(ores, target_pack):
     if not ok_mine:
         return False, None
 
+    # Set last_mined for logging
+    rover.last_mined = Vector2(target_xy[0], target_xy[1])
+
     # kiveszük a kibányászot ércet
     removed = remove_mined_ore(ores, target_xy)
     if removed:
         print(f"Kibányászva: {target_xy}")
     else:
         print("Nem sikerült törölni a kibányászott ércet:", target_xy)
-
-    # a mapból is
-    x, y = target_xy
-    map_obj.map_data[y][x] = "."
-
-    # Frissített map
-    send_setup()
-    send_live_data(current_target=None, planned_path=[])
 
     return True, target_xy
 
@@ -840,6 +897,11 @@ def main():
 
     try:
         Sim.close()
+    except Exception:
+        pass
+
+    try:
+        logger.close()
     except Exception:
         pass
 

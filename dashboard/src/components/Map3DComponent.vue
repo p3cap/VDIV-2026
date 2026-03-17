@@ -14,10 +14,6 @@
  *      + / =                 → zoom in
  *      - / _                 → zoom out
  *      R                     → reset camera
- *
- * Path fix:
- *  - Tube rendered at y:0.05 (flush on ground) with correct XZ centering
- *  - CatmullRom tension:0 + no endpoint duplication (no fold-back artefact)
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
