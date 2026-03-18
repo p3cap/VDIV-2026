@@ -5,8 +5,8 @@ import { Settings, Earth, ChartNoAxesCombined, Rotate3d, House } from 'lucide-vu
 const menuItems = [
     { id: 'welcome', to: '/', icon: House },
     { id: 'map', to: '/map', icon: Earth },
-    { id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined },
     { id: 'map3d', to: '/map3d', icon: Rotate3d },
+    { id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined },
     { id: 'settings', to: '/settings', icon: Settings },
 ]
 </script>

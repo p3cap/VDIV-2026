@@ -9,8 +9,8 @@ const isExpanded = ref(false)
 const menuItems = [
 		{ id: 'welcome', to: '/', icon: House, label: 'Welcome' },
 		{ id: 'map', to: '/map', icon: Earth, label: 'Map' },
-		{ id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined, label: 'Dashboard' },
 		{ id: 'map3d', to: '/map3d', icon: Rotate3d, label: '3d Map' },
+		{ id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined, label: 'Dashboard' },
 		{ id: 'settings', to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
