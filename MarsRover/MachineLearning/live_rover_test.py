@@ -39,11 +39,12 @@ def _decode_inputs(obs_vec: np.ndarray, env) -> dict:
         "battery_pct": float(np.clip(obs_vec[0], 0.0, 1.0) * 100.0),
         "gear_norm": float(obs_vec[1]),
         "run_hrs": float(obs_vec[2] * 240.0),
-        "tod_pct": float(obs_vec[3] * 100.0),
-        "rover_x": int(round(obs_vec[4] / inv_w)),
-        "rover_y": int(round(obs_vec[5] / inv_h)),
-        "prev_mined_x": int(round(obs_vec[6] / inv_w)),
-        "prev_mined_y": int(round(obs_vec[7] / inv_h)),
+        "time_left_pct": float(obs_vec[3] * 100.0),
+        "tod_pct": float(obs_vec[4] * 100.0),
+        "rover_x": int(round(obs_vec[5] / inv_w)),
+        "rover_y": int(round(obs_vec[6] / inv_h)),
+        "prev_mined_x": int(round(obs_vec[7] / inv_w)),
+        "prev_mined_y": int(round(obs_vec[8] / inv_h)),
     }
 
 
@@ -91,7 +92,10 @@ def debug_log(
     ts_print(f"    rover_x: {inputs['rover_x']}")
     ts_print(f"    rover_y: {inputs['rover_y']}")
     ts_print(f"    prev_mined: ({inputs['prev_mined_x']}, {inputs['prev_mined_y']})")
-    ts_print(f"    battery: {inputs['battery_pct']:.1f}%   run_hrs: {inputs['run_hrs']:.1f}h   tod: {inputs['tod_pct']:.1f}%")
+    ts_print(
+        f"    battery: {inputs['battery_pct']:.1f}%   run_hrs: {inputs['run_hrs']:.1f}h"
+        f"   time_left: {inputs['time_left_pct']:.1f}%   tod: {inputs['tod_pct']:.1f}%"
+    )
     ts_print("  Outputs:")
     ts_print(f"    gear: {outputs['gear']} (raw={outputs['gear_raw']:.3f})")
     ts_print(f"    goto_x: {outputs['goto_x']} (norm={outputs['goto_x_norm']:.3f})")
@@ -115,6 +119,7 @@ class LivePolicyEnv:
         self.total_mined = 0
         self._no_move_streak = 0
         self._mining_streak = 0
+        self._no_mine_streak = 0
         self.world = RoverSimulationWorld(
             run_hrs=run_hrs,
             delta_mode=delta_mode,
@@ -173,14 +178,16 @@ class LivePolicyEnv:
         return done, delta_hrs, real_dt_seconds
 
     def reward(self, mined_now: int, dist_gain: float, battery_cost: float, minerals_left: int, is_dead: bool) -> float:
-        reward, self._no_move_streak, self._mining_streak = compute_reward(
+        reward, self._no_move_streak, self._mining_streak, self._no_mine_streak = compute_reward(
             mined_now=mined_now,
             dist_gain=dist_gain,
             battery_cost=battery_cost,
             minerals_left=minerals_left,
             is_dead=is_dead,
+            is_mining=self.world.rover.status == STATUS.MINE,
             no_move_streak=self._no_move_streak,
             mining_streak=self._mining_streak,
+            no_mine_streak=self._no_mine_streak,
         )
         return reward
 

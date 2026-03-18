@@ -1,3 +1,5 @@
-export default {
-	"lang": "hu"
-}
+import { reactive } from 'vue'
+
+export default reactive({
+  lang: 'hu',
+})

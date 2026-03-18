@@ -1,0 +1,4 @@
+mineral_count=10
+use_mineral_distance=True
+per_mineral_fields=3
+obs_size=38
