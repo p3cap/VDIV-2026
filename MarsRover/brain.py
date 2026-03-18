@@ -1,4 +1,8 @@
 from math import ceil
+import argparse
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urlparse
 
 from Simulation_env import RoverSimulationWorld
 from RoverClass import STATUS, GEARS
@@ -13,25 +17,123 @@ except Exception:
     cpp_mod = None
     CPP_AVAILABLE = False
 
-# base url
-BASE_URL = "http://127.0.0.1:8000"
+MARS_ROOT = Path(__file__).resolve().parent
+DEFAULT_MAP_NAME = "mars_map_50x50.csv"
+DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 
-# Initialize RoverLogger
-logger = RoverLogger(BASE_URL)
+# base url
+BASE_URL = DEFAULT_BASE_URL
 
 # A térkép beolv
-CSV_PATH = r"MarsRover/data/mars_map_50x50.csv"
+CSV_PATH = str(MARS_ROOT / "data" / DEFAULT_MAP_NAME)
 
 # Szimuláció paraméterei
 delta_mode = "set_time"
 delta_hrs = 0.5          # 1 tick = fél óra
-tick_seconds = 1         
+tick_seconds = 1
 env_speed = 1.0
 send_every = 1
 run_hrs = 240.0
 
 # adat küldés engedett a beckendnek
 USE_SERVER = True
+
+Sim = None
+rover = None
+sim = None
+map_obj = None
+logger = None
+
+
+def _normalize_base_url(raw: str, fallback: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return fallback
+
+    parsed = urlparse(raw)
+    if not parsed.scheme:
+        raw = f"http://{raw}"
+        parsed = urlparse(raw)
+
+    scheme = parsed.scheme.lower()
+    if scheme in {"ws", "wss"}:
+        scheme = "https" if scheme == "wss" else "http"
+
+    host = parsed.netloc or parsed.path
+    if not host:
+        return fallback
+    return f"{scheme}://{host}"
+
+
+def _resolve_map_path(map_csv_path: Optional[str]) -> Path:
+    if map_csv_path:
+        candidate = Path(map_csv_path)
+        if candidate.exists():
+            return candidate
+
+    default_path = MARS_ROOT / "data" / DEFAULT_MAP_NAME
+    if default_path.exists():
+        return default_path
+
+    fallback = MARS_ROOT.parent / "Data" / "CSV_maps" / DEFAULT_MAP_NAME
+    if fallback.exists():
+        return fallback
+
+    if map_csv_path:
+        raise FileNotFoundError(f"map csv not found: {map_csv_path}")
+    raise FileNotFoundError(f"default map csv not found: {default_path}")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Heuristic rover runner.")
+    parser.add_argument("--run-hrs", type=float, default=run_hrs)
+    parser.add_argument("--delta-mode", type=str, default=delta_mode, choices=["set_time", "real_time"])
+    parser.add_argument("--delta-hrs", type=float, default=delta_hrs)
+    parser.add_argument("--tick-seconds", type=float, default=tick_seconds)
+    parser.add_argument("--env-speed", type=float, default=env_speed)
+    parser.add_argument("--send-every", type=int, default=send_every)
+    parser.add_argument("--base-url", type=str, default=BASE_URL)
+    parser.add_argument("--map-csv", type=str, default=None)
+    parser.add_argument("--use-server", dest="use_server", action="store_true", default=USE_SERVER)
+    parser.add_argument("--no-server", dest="use_server", action="store_false")
+    return parser.parse_args()
+
+
+def init_world(args):
+    global BASE_URL, CSV_PATH, delta_mode, delta_hrs, tick_seconds
+    global env_speed, send_every, run_hrs, USE_SERVER
+    global Sim, rover, sim, map_obj, logger
+
+    run_hrs = float(args.run_hrs)
+    delta_mode = args.delta_mode
+    delta_hrs = float(args.delta_hrs)
+    tick_seconds = float(args.tick_seconds)
+    env_speed = float(args.env_speed)
+    send_every = int(args.send_every)
+    USE_SERVER = bool(args.use_server)
+
+    BASE_URL = _normalize_base_url(args.base_url, DEFAULT_BASE_URL)
+    map_path = _resolve_map_path(args.map_csv)
+    CSV_PATH = str(map_path)
+
+    Sim = RoverSimulationWorld(
+        run_hrs=run_hrs,
+        delta_mode=delta_mode,
+        set_delta_hrs=delta_hrs,
+        tick_seconds=tick_seconds,
+        env_speed=env_speed,
+        web_logger=False,
+        base_url=BASE_URL,
+        send_every=send_every,
+        map_csv_path=CSV_PATH,
+    )
+
+    rover = Sim.rover
+    sim = Sim.sim
+    map_obj = Sim.sim.map_obj
+    rover.pos = Vector2(0, 0)
+
+    logger = RoverLogger(BASE_URL) if USE_SERVER else None
 
 # Az ércek értékei
 ORE_VALUES = {
@@ -75,25 +177,6 @@ DENSE_CLUSTER_BONUS = 18
 CLUSTER_STICKINESS = 40
 
 # WORLD / SIM INICIALIZÁLÁS
-
-Sim = RoverSimulationWorld(
-    run_hrs=run_hrs,
-    delta_mode=delta_mode,
-    set_delta_hrs=delta_hrs,
-    tick_seconds=tick_seconds,
-    env_speed=env_speed,
-    web_logger=False,
-    base_url=BASE_URL,
-    send_every=send_every,
-)
-
-# referenciák
-rover = Sim.rover
-sim = Sim.sim
-map_obj = Sim.sim.map_obj
-
-# Kezdő pozíció
-rover.pos = Vector2(0, 0)
 
 
 # ENUM / GEAR SEGÉD
@@ -151,7 +234,7 @@ def get_current_speed_value():
 # BACKEND UPDATE
 
 def send_setup():
-    if not USE_SERVER:
+    if not USE_SERVER or logger is None:
         return
     try:
         logger.send_setup({"map_matrix": map_obj.map_data})
@@ -159,7 +242,7 @@ def send_setup():
         print("send_setup hiba:", e)
 
 def send_live_data(current_target=None, planned_path=None):
-    if not USE_SERVER:
+    if not USE_SERVER or logger is None:
         return
 
     try:
@@ -814,6 +897,8 @@ def main():
     """
     Fő vezérlő ciklus.
     """
+    args = parse_args()
+    init_world(args)
     refresh_refs()
 
     # Összes érc összegyűjtése induláskor
@@ -896,12 +981,14 @@ def main():
     print("Megmaradt ércek:", len(ores))
 
     try:
-        Sim.close()
+        if Sim is not None:
+            Sim.close()
     except Exception:
         pass
 
     try:
-        logger.close()
+        if logger is not None:
+            logger.close()
     except Exception:
         pass
 
