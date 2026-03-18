@@ -1,5 +1,13 @@
 <template>
     <div class="map-wrapper">
+        <div class="texture-switcher">
+            <label for="texture-pack">Textures</label>
+            <select id="texture-pack" v-model="activeTexturePack">
+                <option v-for="pack in texturePacks" :key="pack" :value="pack">
+                    {{ formatTexturePack(pack) }}
+                </option>
+            </select>
+        </div>
         <div ref="pixiContainer" class="pixi-container"></div>
     </div>
 </template>
@@ -9,17 +17,23 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as PIXI from 'pixi.js'
 import { Viewport } from 'pixi-viewport'
 import { Assets } from 'pixi.js'
-import surface from '@/assets/textures/redsand.png'
-import stone from '@/assets/textures/stone.jpg'
-import lapis from '@/assets/textures/lapis.webp'
-import copper from '@/assets/textures/copper.webp'
-import gold from '@/assets/textures/gold.jpeg'
+import ground from '@/assets/default/redsand.png'
+import barrier from '@/assets/default/stone.jpg'
+import blue from '@/assets/default/lapis.webp'
+import green from '@/assets/default/copper.webp'
+import yellow from '@/assets/default/gold.jpeg'
 import roverImg from '@/assets/rover.png'
 
-let roverTexture = null
-onMounted(async () => {
-    roverTexture = await Assets.load(roverImg)
-})
+const textureFiles = import.meta.glob('@/assets/**/*.png', { eager: true, as: 'url' })
+const textureIndex = Object.entries(textureFiles).reduce((acc, [path, url]) => {
+    const normalized = path.replaceAll('\\', '/')
+    const match = normalized.match(/\/assets\/([^/]+)\/([^/]+\.png)$/)
+    if (!match) return acc
+    const [, pack, filename] = match
+    acc[pack] = acc[pack] || {}
+    acc[pack][filename] = url
+    return acc
+}, {})
 
 const props = defineProps({
     roverPosition: { type: Object, default: () => ({ x: 0, y: 0 }) },
@@ -31,6 +45,8 @@ const props = defineProps({
 const pixiContainer = ref(null)
 const initialized = ref(false)
 const cellSize = ref(16)
+const activeTexturePack = ref('pixelart')
+const texturePacks = ['default', 'pixelart', 'minecraft']
 
 let app = null
 let viewport = null
@@ -40,14 +56,25 @@ let pathGraphics = null
 let textureMap = {}
 let cellNodes = []
 let grid = ref([])
+let roverTexture = null
+let textureLoadId = 0
 
-const texturePaths = {
-    '.': surface,
-    '#': stone,
-    B: lapis,
-    Y: gold,
-    G: copper,
-    S: surface,
+const defaultTextureUrls = {
+    ground: ground,
+    barrier: barrier,
+    blue: blue,
+    yellow: yellow,
+    green: green,
+    rover: roverImg,
+}
+
+const textureKeysByCell = {
+    '.': 'ground',
+    S: 'ground',
+    '#': 'barrier',
+    B: 'blue',
+    Y: 'yellow',
+    G: 'green',
 }
 
 onMounted(async () => {
@@ -87,18 +114,7 @@ onMounted(async () => {
     mapContainer = new PIXI.Container()
     viewport.addChild(mapContainer)
 
-    textureMap = await loadTextures()
-
-    drawFullGrid()
-
-    pathGraphics = new PIXI.Graphics()
-    mapContainer.addChild(pathGraphics)
-
-    rover = createRover()
-    mapContainer.addChild(rover)
-
-    updateRoverPosition(props.roverPosition, true)
-    drawPath() // initial draw
+    await applyTexturePack(activeTexturePack.value, { initial: true })
 
     viewport.fit(true)
     viewport.moveCenter(worldW / 2, worldH / 2)
@@ -113,16 +129,68 @@ onUnmounted(() => {
     if (app) app.destroy(true, { children: true })
 })
 
-async function loadTextures() {
+function formatTexturePack(pack) {
+    const labels = {
+        default: 'Default',
+        pixelart: 'Pixel Art',
+        minecraft: 'Minecraft',
+    }
+    return labels[pack] ?? pack
+}
+
+function resolveTextureUrl(pack, key) {
+    const filename = `${key}.png`
+    const packUrl = textureIndex[pack]?.[filename]
+    if (packUrl) return packUrl
+    const fallbackUrl = textureIndex.default?.[filename]
+    if (fallbackUrl) return fallbackUrl
+    return defaultTextureUrls[key] ?? null
+}
+
+async function loadTextures(pack) {
     const map = {}
-    for (const [key, path] of Object.entries(texturePaths)) {
+    for (const [cellType, key] of Object.entries(textureKeysByCell)) {
+        const url = resolveTextureUrl(pack, key)
         try {
-            map[key] = await Assets.load(path)
+            map[cellType] = url ? await Assets.load(url) : null
         } catch {
-            map[key] = null
+            map[cellType] = null
         }
     }
-    return map
+    const roverUrl = resolveTextureUrl(pack, 'rover')
+    let roverTex = null
+    try {
+        roverTex = roverUrl ? await Assets.load(roverUrl) : null
+    } catch {
+        roverTex = null
+    }
+    return { map, roverTex }
+}
+
+async function applyTexturePack(pack, { initial = false } = {}) {
+    const currentLoadId = ++textureLoadId
+    const { map, roverTex } = await loadTextures(pack)
+    if (currentLoadId !== textureLoadId) return
+
+    textureMap = map
+    roverTexture = roverTex ?? roverTexture
+
+    if (initial) {
+        drawFullGrid()
+
+        pathGraphics = new PIXI.Graphics()
+        mapContainer.addChild(pathGraphics)
+
+        rover = createRover()
+        mapContainer.addChild(rover)
+
+        updateRoverPosition(props.roverPosition, true)
+        drawPath()
+        return
+    }
+
+    refreshGridTextures()
+    if (rover && roverTexture) rover.texture = roverTexture
 }
 
 function drawFullGrid() {
@@ -159,7 +227,7 @@ function createCell(type, x, y) {
 
 function createRover() {
     const size = cellSize.value * 0.8
-    const sprite = new PIXI.Sprite(roverTexture)
+    const sprite = new PIXI.Sprite(roverTexture ?? PIXI.Texture.WHITE)
     sprite.width = size
     sprite.height = size
     sprite.anchor.set(0.5)
@@ -233,7 +301,38 @@ function getColor(type) {
     return c[type] ?? 0x777777
 }
 
+function refreshGridTextures() {
+    if (!mapContainer || !cellNodes.length) return
+    for (let y = 0; y < grid.value.length; y++) {
+        for (let x = 0; x < grid.value[y].length; x++) {
+            const type = grid.value[y][x]
+            const old = cellNodes[y][x]
+            if (!old) {
+                const neu = createCell(type, x, y)
+                cellNodes[y][x] = neu
+                mapContainer.addChild(neu)
+                continue
+            }
+            const idx = mapContainer.children.indexOf(old)
+            if (idx === -1) continue
+            mapContainer.removeChild(old)
+            old.destroy()
+            const neu = createCell(type, x, y)
+            mapContainer.addChildAt(neu, idx)
+            cellNodes[y][x] = neu
+        }
+    }
+}
+
 // ��� Watches ������������������������������������������������
+
+watch(
+    () => activeTexturePack.value,
+    (pack) => {
+        if (!initialized.value) return
+        applyTexturePack(pack)
+    },
+)
 
 watch(
     () => props.roverPosition,

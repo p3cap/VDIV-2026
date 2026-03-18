@@ -9,16 +9,16 @@ Csapat neve: huh?!
 Csapatagok nevei: Dobosi Péter, Kovács Dávid, Torontáli Ádám
 Iskola: BMSZC Puskás Tivadar Távközlési és Informatikai Technikum
 Felkészítő tanár: Zámbó Dominik
-Elérhetőségek**:
+Elérhetőségek:
   - Dobosi Péter Dániel: dobosipetidani@gmail.com 
   - Torontáli Ádám: torontaliadi07@gmail.com
   - Kovács Dávid: kovacs.david8002@gmail.com
 - programfejlesztői környezetek és verziói**: Python3.13, javascript-ES2025, c++
 
-======== Setup ========
-- Telepísd a Python 3.13 vagy újabb verziót. (https://www.python.org/downloads/)
-- Telepísd a node.js-t. (https://nodejs.org/en/download)
-- Telepísd a c++ (opcionális, gyorsabb pathfinding-hoz ajánlott)
+======== Szükségek programok ========
+- Python 3.13 vagy újabb verziója (https://www.python.org/downloads/)
+- node.js (https://nodejs.org/en/download)
+- C++ (opcionális, gyorsabb pathfinding-hoz ajánlott)
 
 ======== Futtatás ========
 
@@ -38,4 +38,5 @@ melőtt újra elindítot a run dev fájlt
 
 ======== Dokumentáció ========
 
-Részletesebb dokumentáció megtalálható a doc/hu mappában
+Részletesebb dokumentáció megtalálható a dashboard dokumentáció szekciójában,
+illetve a dashboard/src/doc/hu mappában
