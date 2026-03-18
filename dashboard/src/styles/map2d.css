@@ -112,7 +112,7 @@
 .map-wrapper .texture-switcher {
   position: absolute;
   top: var(--sp-3);
-  left: var(--sp-3);
+  left: var(--sidebar-w);
   z-index: 5;
   display: flex;
   align-items: center;

@@ -32,11 +32,13 @@ Program indítása: `python run_dev_win.py`
 
 ======== Használati Útmutató ========
 
-A futtatás után a terminálban ki kell választani a futtatási opciókat. 
+A futtatás után a terminálban ki kell választani a futtatási opciókat, majd
+a program elindítja a Szimulációt, a szervert és a dashboardot és megnyitja a frontented böngészőben.
+
 Új szimuláció futtatásához nyomj ENTER-t a run_dev terminálba, vagy zárd be, hogy leállítsa a folyamatokat,
 melőtt újra elindítot a run dev fájlt
 
 ======== Dokumentáció ========
 
-Részletesebb dokumentáció megtalálható a dashboard dokumentáció szekciójában,
+Részletesebb dokumentáció megtalálható a dashboard (yfcsfc) dokumentáció szekciójában,
 illetve a dashboard/src/doc/hu mappában

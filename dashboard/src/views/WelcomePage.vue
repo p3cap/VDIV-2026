@@ -3,9 +3,9 @@
 		<!-- ── Hero ─────────────────────────────── -->
 		<div class="welcome-hero">
 			<span ref="eyebrow" class="welcome-eyebrow">huh?! csapat · 2026</span>
-			<h1 ref="title" class="welcome-title">Üdvözlünk!</h1>
+			<h1 ref="title" class="welcome-title">{{ t("nav_welcome") }}</h1>
 			<p ref="sub" class="welcome-sub">
-				Mi vagyunk a <strong style="color: var(--accent)">huh?!</strong> csapat
+				{{ t("welcome_sub") }} <strong style="color: var(--accent)">huh?!</strong> {{ t("team") }}
 			</p>
 		</div>
 
@@ -198,7 +198,7 @@
 					<!-- Footer -->
 					<div class="wmodal__foot">
 						<button class="wmodal__btn wmodal__btn--primary" @click.stop="closeModal">
-							Bezárás
+							{{ t("close") }}
 						</button>
 					</div>
 				</div>
@@ -208,6 +208,7 @@
 </template>
 
 <script setup>
+import { translateKey as t } from "@/data/translate.js";
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { RouterLink } from 'vue-router'
 import { animate, createTimeline } from 'animejs'
@@ -237,29 +238,29 @@ const cards = [
 				role: 'Backend',
 				avatar: 'TA',
 				bio: 'backendcppvalami',
-				refUrl: 'https://derike.hu',
-				refLabel: 'fityma',
+				refUrl: 'https://github.com/torontali',
+				refLabel: 'github',
 			},
 			{
 				name: 'Kovács Dávid',
-				role: 'Frontend',
+				role: 'Frontend - Backend',
 				avatar: 'KD',
-				bio: 'frontendanimacio biszbas das dasddasdas dasda sd asdas d as d asd asdas das z',
-				refUrl: 'https://derike.hu',
-				refLabel: 'fityma',
+				bio: 'A frontend fejlesztés jelentős részét én végeztem, emellett a backend oldali adatküldési logika kialakításában is aktívan részt vettem.',
+				refUrl: 'https://github.com/kovacsdavid0',
+				refLabel: 'github',
 			},
 			{
 				name: 'Dobosi Péter',
-				role: 'Backend',
+				role: 'Backend - Frontend',
 				avatar: 'DP',
-				bio: 'geptanulhaha',
-				refUrl: 'https://derike.hu',
-				refLabel: 'fityma',
+				bio: 'A szimulációs környezetet és a a machine learning megoldásokat én fejlesztettem, emellett kisebb mértékben frontend feladatokban is részt vettem.',
+				refUrl: 'https://github.com/p3cap',
+				refLabel: 'github',
 			},
 		],
 		sections: [
-			{ title: 'Csapatbemutató', text: 'Ide kerül a csapat leírása.' },
-			{ title: 'Motiváció', text: 'Ide kerül a motiváció leírása.' },
+			{ title: 'Csapatbemutató', text: 'A BMSZC Puskás Tivadar Távközlési és Informatikai Technikum tanulői vagyunk, 11. évfolyamon tanulunk Szoftverfejlesztő és Tesztelő szakirányon.' },
+			{ title: 'Motiváció', text: 'Nagy érdeklődéssel fordulunk az informatika világa felé, folyamatosan kutatva az új technológiákat és a hatékonyabb megoldásokat. Lépést tartunk a fejlődéssel, és nemcsak programozási tudásunkat fejlesztjük, hanem problémamegoldó készségeinket is folyamatosan erősítjük.' },
 		],
 	},
 	{
@@ -270,12 +271,12 @@ const cards = [
 		title: 'Hogyan működik?',
 		blurb: 'A rendszer architektúrája és a mögöttes technológia.',
 		stats: [
-			{ label: 'Stack', value: 'Vue 3' },
-			{ label: 'Render', value: '2D + 3D' },
+			{ label: 'Frontend', value: 'Vue 3, Node.js, websokcet server' },
+			{ label: 'Backend', value: 'Machine Learning, C++ pathfinding' },
 		],
 		sections: [
-			{ title: 'Architektúra', text: 'Ide kerül az architektúra leírása.' },
-			{ title: 'Technológiák', text: 'Ide kerülnek a technológiák.' },
+			{ title: 'Frontend', text: 'Vue-val készült, 2D és 3D-s vizualizáció. Az összeköttető szerverrel webscoket-el kommunikál.' },
+			{ title: 'Backend', text: 'PPO alapú deep reinforcement learning algoritmus-al képzett modellek, illetve egy optimalizált nem ML alapján készült bányászó algoritmus. A* útvonal tervező algoritmus, c++ -ban optimalizálva.' },
 		],
 	},
 	{
@@ -288,7 +289,7 @@ const cards = [
 		sections: [
 			{
 				title: 'Leírás megtekintése',
-				text: 'A dokumentáció tartalma itt is megtekinthető.',
+				text: 'A dokumentáció tartalma itt tekinthető meg.',
 				route: '/documentation',
 			},
 		],
