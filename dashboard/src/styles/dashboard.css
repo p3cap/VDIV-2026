@@ -16,7 +16,7 @@
 
 .dashboard {
   position: relative;
-  width: calc(100% - var(--sidebar-w));
+  width: calc(100vw - var(--sidebar-w));
   min-height: 100vh;
   background: var(--clr-void);
   color: var(--txt-primary);
@@ -509,84 +509,75 @@
   background: var(--clr-void);
 }
 
-/* ────────────────────────────────
-   Responsive
-   ──────────────────────────────── */
-@media (max-width: 576px) {
+/* responsiveness */
+@media (min-width: 577px) and (max-width: 900px) {
   .dashboard {
-    width: 100%;
-    margin-left: 0;
-    margin-top: var(--navbar-h);
+    width: calc(100vw - var(--sidebar-w));
+    margin-left: var(--sidebar-w);
   }
-  .dashboard .dash-header{
-    width: 100vw;
+  .dashboard .dash-header {
+    width: calc(100vw - var(--sidebar-w));
   }
   .dashboard .dash-grid {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
-    padding: 12px;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 14px;
+    padding: 14px;
   }
-
   .dashboard .status-card,
   .dashboard .battery-card,
-  .dashboard .scatter-card {
-    grid-column: span 3;
-  }
-  .dashboard .storage-card {
-    grid-column: span 6;
-  }
-  .dashboard .chart-card {
-    grid-column: span 6;
-  }
-
-  .dashboard .card {
-    min-width: 0;
-    padding: 16px;
-  }
+  .dashboard .chart-card  { grid-column: span 4; }
+  .dashboard .storage-card,
+  .dashboard .scatter-card { grid-column: span 8; }
+  .dashboard .card { min-width: 0; }
 }
 
-@media (max-width: 900px) {
+/* ── Mid desktop: sidebar present (901px–1100px) ── */
+@media (min-width: 901px) and (max-width: 1100px) {
   .dashboard .dash-grid {
     grid-template-columns: repeat(8, 1fr);
   }
-
   .dashboard .status-card,
   .dashboard .battery-card,
-  .dashboard .chart-card {
-    grid-column: span 4;
-  }
+  .dashboard .chart-card  { grid-column: span 4; }
   .dashboard .storage-card,
-  .dashboard .scatter-card {
-    grid-column: span 8;
-  }
+  .dashboard .scatter-card { grid-column: span 6; }
 }
 
-@media (min-width: 901px) and (max-width: 1100px) {
-  .dashboard .status-card,
-  .dashboard .battery-card,
-  .dashboard .chart-card {
-    grid-column: span 4;
-  }
-  .dashboard .storage-card,
-  .dashboard .scatter-card {
-    grid-column: span 6;
-  }
-}
-
+/* ── Large desktop (1101px+) ── */
 @media (min-width: 1101px) {
   .dashboard .dash-grid {
     grid-template-columns: repeat(12, 1fr);
     gap: var(--sp-3);
     padding: var(--sp-3);
   }
+  .dashboard .status-card { grid-column: span 4;}
+  .dashboard .battery-card { grid-column: span 4;}
+  .dashboard .storage-card { grid-column: span 4;}
+  .dashboard .chart-card  { grid-column: span 6; }
+  .dashboard .scatter-card { grid-column: span 6; }
+}
 
+/* ── Mobile: no sidebar, top navbar only (≤576px) ── */
+@media (max-width: 576px) {
+  .dashboard {
+    width: 100%;
+    margin-left: 0;
+    margin-top: var(--navbar-h);
+  }
+  .dashboard .dash-header {
+    position: sticky;
+    top: 0;
+    width: 100%;
+  }
+  .dashboard .dash-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
   .dashboard .status-card,
   .dashboard .battery-card,
-  .dashboard .chart-card {
-    grid-column: span 4;
-  }
+  .dashboard .scatter-card { grid-column: span 3; }
   .dashboard .storage-card,
-  .dashboard .scatter-card {
-    grid-column: span 6;
-  }
+  .dashboard .chart-card   { grid-column: span 6; }
+  .dashboard .card { min-width: 0; padding: 16px; }
 }

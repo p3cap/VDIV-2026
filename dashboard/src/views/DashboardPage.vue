@@ -114,33 +114,6 @@
 				</div>
 			</div>
 
-			<!-- Distance line chart -->
-			<div class="card chart-card">
-				<div class="card-header">
-					<span class="card-title">DISTANCE OVER TIME</span>
-					<div class="legend-row">
-						<span class="leg-dot" style="background: #00ffc8" /><span
-							>Distance (m)</span
-						>
-					</div>
-				</div>
-				<div ref="distRef" class="uplot-wrap" />
-			</div>
-
-			<!-- Energy line chart -->
-			<div class="card chart-card">
-				<div class="card-header">
-					<span class="card-title">ENERGY BALANCE</span>
-					<div class="legend-row">
-						<span class="leg-dot" style="background: #4ade80" /><span>Produce</span>
-						<span class="leg-dot" style="background: #ff6b35; margin-left: 10px" /><span
-							>Consume</span
-						>
-					</div>
-				</div>
-				<div ref="energyRef" class="uplot-wrap" />
-			</div>
-
 			<!-- Storage pie (SVG, no lib needed) -->
 			<div class="card storage-card">
 				<div class="card-header">
@@ -171,6 +144,36 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- Distance line chart -->
+			<div class="card chart-card">
+				<div class="card-header">
+					<span class="card-title">DISTANCE OVER TIME</span>
+					<div class="legend-row">
+						<span class="leg-dot" style="background: #00ffc8" /><span
+							>Distance (m)</span
+						>
+					</div>
+				</div>
+				<div ref="distRef" class="uplot-wrap" />
+			</div>
+
+			<!-- Energy line chart -->
+			<div class="card chart-card">
+				<div class="card-header">
+					<span class="card-title">ENERGY BALANCE</span>
+					<div class="legend-row">
+						<span class="leg-dot" style="background: #4ade80" /><span>Produce</span>
+						<span class="leg-dot" style="background: #ff6b35; margin-left: 10px" /><span
+							>Consume</span
+						>
+					</div>
+				</div>
+				<div ref="energyRef" class="uplot-wrap" />
+			</div>
+
+			
+			
 		</main>
 	</div>
 </template>
