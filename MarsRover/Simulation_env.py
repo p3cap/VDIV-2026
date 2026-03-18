@@ -1,6 +1,7 @@
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 MARS_ROVER_ROOT = Path(__file__).resolve().parent
 sys.path.append(str(MARS_ROVER_ROOT))
@@ -10,10 +11,32 @@ from RoverClass import Rover
 from Simulation import Simulation
 from RoverLogger import RoverLogger
 
+DEFAULT_MAP_NAME = "mars_map_50x50.csv"
+
+
+def _resolve_map_path(map_csv_path: Optional[str]) -> Path:
+    if map_csv_path:
+        candidate = Path(map_csv_path)
+        if candidate.exists():
+            return candidate
+
+    default_path = MARS_ROVER_ROOT / "data" / DEFAULT_MAP_NAME
+    if default_path.exists():
+        return default_path
+
+    fallback = MARS_ROVER_ROOT.parent / "Data" / "CSV_maps" / DEFAULT_MAP_NAME
+    if fallback.exists():
+        return fallback
+
+    if map_csv_path:
+        raise FileNotFoundError(f"map csv not found: {map_csv_path}")
+    raise FileNotFoundError(f"default map csv not found: {default_path}")
+
+
 class RoverSimulationWorld:
     """Creates, resets, and steps the rover simulation world."""
 
-    def __init__(self, run_hrs: float = 24.0, delta_mode: str = "set_time", set_delta_hrs: float = 0.5, tick_seconds: float = 0.0, env_speed: float = 1.0, web_logger: bool = False, base_url: str = "http://127.0.0.1:8000", send_every: int = 1,):
+    def __init__(self, run_hrs: float = 24.0, delta_mode: str = "set_time", set_delta_hrs: float = 0.5, tick_seconds: float = 0.0, env_speed: float = 1.0, web_logger: bool = False, base_url: str = "http://127.0.0.1:8000", send_every: int = 1, map_csv_path: Optional[str] = None):
         self.run_hrs = run_hrs
         self.delta_mode = delta_mode
         self.set_delta_hrs = max(0.0, float(set_delta_hrs))
@@ -24,7 +47,7 @@ class RoverSimulationWorld:
         self.websocket_logger = RoverLogger(base_url) if self.web_logger else None
         self._step_count = 0
         self.last_send_ok = None
-        self.map_path = MARS_ROVER_ROOT / "data" / "mars_map_50x50.csv"
+        self.map_path = _resolve_map_path(map_csv_path)
         self.map_template = matrix_from_csv(str(self.map_path))
         self.map_width = len(self.map_template[0])
         self.map_height = len(self.map_template)

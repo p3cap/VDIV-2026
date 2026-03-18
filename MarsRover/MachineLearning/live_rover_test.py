@@ -109,7 +109,7 @@ def debug_log(
 class LivePolicyEnv:
     """Minimal policy inference wrapper over RoverSimulationWorld."""
 
-    def __init__(self, run_hrs: float, mineral_count: int, delta_mode: str, set_delta_hrs: float, tick_seconds: float, env_speed: float, base_url: str, send_every: int):
+    def __init__(self, run_hrs: float, mineral_count: int, delta_mode: str, set_delta_hrs: float, tick_seconds: float, env_speed: float, base_url: str, send_every: int, map_csv_path: Optional[str] = None):
         self.mineral_count = mineral_count
         self.prev_mined = None
         self.total_mined = 0
@@ -124,6 +124,7 @@ class LivePolicyEnv:
             web_logger=True,
             base_url=base_url,
             send_every=send_every,
+            map_csv_path=map_csv_path,
         )
         self.obs_size = obs_size(self.mineral_count)  # input size
         self._obs_buf = np.zeros(self.obs_size, dtype=np.float32)
@@ -251,6 +252,7 @@ def main():
     parser.add_argument("--send-every", type=int, default=1, help="Send websocket data every N steps.")
     parser.add_argument("--run-hrs", type=float, default=240.0, help="Sim run hours per episode.")
     parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000", help="Backend base URL.")
+    parser.add_argument("--map-csv", type=str, default=None, help="CSV map path.")
     parser.add_argument("--deterministic", dest="deterministic", action="store_true", default=True, help="Use deterministic policy actions (default).")
     parser.add_argument("--stochastic", dest="deterministic", action="store_false", help="Use stochastic policy actions.")
     parser.add_argument("--debug", action="store_true", help="Print raw policy inputs/outputs plus decoded fields per step.")
@@ -271,6 +273,7 @@ def main():
         env_speed=args.env_speed,
         base_url=args.base_url,
         send_every=args.send_every,
+        map_csv_path=args.map_csv,
     )
     obs = env.obs()
     step = 0

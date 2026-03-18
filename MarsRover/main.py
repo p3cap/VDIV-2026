@@ -25,8 +25,11 @@ def parse_args():
         default="set_time",
     )
     parser.add_argument("--delta-hrs", type=float, default=0.5)
+    parser.add_argument("--run-hrs", type=float, default=2400.0)
     parser.add_argument("--tick-seconds", type=float, default=1.0)
     parser.add_argument("--env-speed", type=float, default=1.0)
+    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000")
+    parser.add_argument("--map-csv", type=str, default=None)
     parser.add_argument("--target-marker", type=str, default="B")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
@@ -49,12 +52,14 @@ def main():
         random.seed(args.seed)
 
     world = RoverSimulationWorld(
-        run_hrs=2400.0,
+        run_hrs=args.run_hrs,
         delta_mode=args.delta_mode,
         set_delta_hrs=args.delta_hrs,
         tick_seconds=args.tick_seconds,
         env_speed=args.env_speed,
         web_logger=True,
+        base_url=args.base_url,
+        map_csv_path=args.map_csv,
     )
 
     rover: Rover = world.rover
