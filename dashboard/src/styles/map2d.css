@@ -109,6 +109,49 @@
   height: 100%;
 }
 
+.map-wrapper .texture-switcher {
+  position: absolute;
+  top: var(--sp-3);
+  left: var(--sp-3);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--glass-mid);
+  border: var(--border-accent);
+  border-radius: var(--r-sm);
+  font-family: var(--font-tele);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+  backdrop-filter: var(--blur-sm);
+}
+
+.map-wrapper .texture-switcher label {
+  color: var(--txt-dim);
+}
+
+.map-wrapper .texture-switcher select {
+  appearance: none;
+  background: rgba(12, 18, 28, 0.85);
+  color: var(--txt);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-tele);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.map-wrapper .texture-switcher select:focus {
+  border-color: rgba(0, 255, 204, 0.35);
+  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.12);
+}
+
 /* ── Night overlay ── */
 .map-container .night-overlay {
   position: absolute;

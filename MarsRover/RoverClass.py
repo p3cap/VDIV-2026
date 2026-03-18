@@ -1,4 +1,3 @@
-from MapClass import Map
 from Simulation import Simulation
 from Global import Vector2, MARS_ROVER_PATH
 
@@ -12,10 +11,9 @@ from pathlib import Path as FilePath
 try:
 	import cpp_path as _cpp_mod
 	_CPP_AVAILABLE = True
-except Exception:
+except:
 	_cpp_mod = None
 	_CPP_AVAILABLE = False
-
 
 class STATUS(Enum):
 	MINE = "mine"
@@ -23,13 +21,12 @@ class STATUS(Enum):
 	MOVE = "move"
 	DEAD = "dead"
 
-class GEARS(Enum):  # blocks/hr
+class GEARS(Enum): # blocks/hr
 	SLOW   = 2
 	NORMAL = 4
 	FAST   = 6
 
 Path = List[Vector2]
-
 
 class Rover:
 	MAX_BATTERY_CHARGE         = 100
@@ -81,8 +78,7 @@ class Rover:
 			case _:            return 0.0
 
 	def energy_produced(self, delta_hrs: float) -> float:
-		daytime = self.sim.get_daytime_in_interval(self.sim.elapsed_hrs,
-		                                            self.sim.elapsed_hrs + delta_hrs)
+		daytime = self.sim.get_daytime_in_interval(self.sim.elapsed_hrs, self.sim.elapsed_hrs + delta_hrs)
 		return daytime * self.DAY_CHARGE_PER_HR
 
 # ---------------- A* PATHFINDING ----------------

@@ -14,7 +14,7 @@ const menuItems = [
 <template>
     <nav class="mobile-nav">
         <RouterLink to="/" class="logo">
-            <img src="@/assets/textures/pttt_logo_mini.png" alt="logo" />
+            <img src="@/assets/pttt_logo_mini.png" alt="logo" />
         </RouterLink>
 
         <ul>

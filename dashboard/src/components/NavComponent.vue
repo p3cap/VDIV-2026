@@ -81,7 +81,7 @@ onMounted(() => {
 		>
 				<ul>
 						<li class="logo">
-								<img src="@/assets/textures/pttt_logo_mini.png" alt="logo" />
+								<img src="@/assets/pttt_logo_mini.png" alt="logo" />
 						</li>
 
 						<li v-for="(item, index) in menuItems" :key="item.id" :id="item.id" class="menu-item">
