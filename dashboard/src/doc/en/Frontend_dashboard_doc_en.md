@@ -9,10 +9,12 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 4. Views read from the store and pass the data to components via props.
 
 ## Pages (Views)
-- `MapPage.vue`: 2D map using PixiJS. The map, rover position, and path come from the store.
+- `WelcomePage.vue`: landing page with cards and modals.
+- `Map2dPage.vue`: 2D map using PixiJS. The map, rover position, and path come from the store.
 - `DashboardPage.vue`: statistics and charts. uPlot charts + custom SVG/Canvas elements.
 - `Map3dPage.vue`: 3D map using Three.js with HUD and instrument overlays.
-- `WelcomePage.vue`: a welcome page with general information.
+- `DocumentationPage.vue`: in-app docs view (markdown loaded from `dashboard/src/doc/{hu,en}`).
+- `SettingsComponent.vue`: settings (currently a placeholder).
 
 ## Data Flow and State
 - `stores/liveWs.js`
@@ -26,28 +28,36 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 - `RoverHud.vue`: pure presentational overlay for the 3D view.
 - `RoverInstruments.vue`: instruments (speed, status, battery).
 - `NavComponent.vue`: animejs-animated icon sidebar.
-- `NavbarPhoneComponent.vue`: mobile navigation.
-- `ChartComponent.vue`: ECharts wrapper (optional, reusable).
-- `HeatMap.vue`: ECharts heatmap for map matrix visualization.
-- `SettingsComponent.vue`: Settings (to be continued).
+- `NavPhoneComponent.vue`: mobile navigation.
+- `RoverStatsComponent.vue`: placeholder.
+- `SettingsComponent.vue`: placeholder.
 
 ## Libraries Used (actually used in the code)
-- `vue` – UI framework
-- `vue-router` – page navigation
-- `pinia` – state management
-- `pixi.js`, `pixi-viewport` – 2D map rendering
-- `three` – 3D map rendering
-- `uplot` – performance-friendly, dynamic charts
-- `echarts` – heatmaps / general charts
-- `animejs` – animations
-- `lucide-vue-next` – icons
+- `vue` – UI framework, components and reactive state.
+- `vue-router` – page navigation and route-based views.
+- `pinia` – global state management (`liveWs` store).
+- `pixi.js` – 2D map rendering (sprites, textures, canvas).
+- `pixi-viewport` – pan/zoom/drag controls for the 2D map.
+- `three` – 3D map rendering (scene, camera, meshes, lights).
+- `uplot` – lightweight, fast line charts on the dashboard.
+- `animejs` – sidebar and welcome page animations.
+- `lucide-vue-next` – icon set for navigation.
+- `marked` – markdown -> HTML conversion for the docs view.
+- `github-markdown-css` – markdown styling for the docs view.
+
+## Installed but currently unused
+- `echarts` – no active usage in the frontend (legacy / planned charts).
+- `@tresjs/core`, `@tresjs/cientos` – no active usage (Three.js wrapper).
 
 ## Installation and Running
 
 ### macOS / Linux
-- Install dependencies: `python3 setup_deps.py`
-- Run the server: `python3 run_dev_win.py`
+- Install dependencies: `python3 setup/setup_deps.py`
+- Run the server: `python3 setup/run_dev.py`
 
 ### Windows
-- Install dependencies: `python setup_deps.py`
-- Run the server: `python run_dev_win.py`
+- Install dependencies: `python setup/setup_deps.py`
+- Run the server: `python setup/run_dev_win.py`
+
+### Node version
+- Recommended: `node` `^20.19.0` or `>=22.12.0`

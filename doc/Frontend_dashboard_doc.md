@@ -1,6 +1,6 @@
 # Frontend (Dashboard) – áttekintés
 
-A vizualizáció Vite + Vue 3 alapú , amely valós idejű adatokat jelenít meg FastAPI WebSocketen keresztül. A nézetek külön oldalakon vannak, a globális adatfolyamot Pinia store kezeli.
+A vizualizáció Vite + Vue 3 alapú, amely valós idejű adatokat jelenít meg FastAPI WebSocketen keresztül. A nézetek külön oldalakon vannak, a globális adatfolyamot Pinia store kezeli.
 
 ## Fő működés röviden
 1. Az app belépési pontja `dashboard/src/main.js`, itt indul a Vue app, a router és a Pinia.
@@ -9,10 +9,12 @@ A vizualizáció Vite + Vue 3 alapú , amely valós idejű adatokat jelenít meg
 4. A nézetek a store-ból olvasnak, és props-on keresztül adják tovább a komponenseknek.
 
 ## Oldalak (Views)
-- `MapPage.vue`: 2D térkép PixiJS-sel. A map  + rover pozíció + útvonal a store-ból.
+- `WelcomePage.vue`: üdvözlő/landing oldal kártyákkal és modalokkal.
+- `Map2dPage.vue`: 2D térkép PixiJS-sel. A map + rover pozíció + útvonal a store-ból.
 - `DashboardPage.vue`: statisztikák, grafikonok. uPlot chartok + saját SVG/Canvas elemek.
 - `Map3dPage.vue`: 3D térkép Three.js-szel, HUD és műszerek overlayként.
-- `WelcomePage.vue`: egy üdvözlő oldal általános adatokkal.
+- `DocumentationPage.vue`: beépített dokumentációs nézet (markdown betöltés `dashboard/src/doc/{hu,en}` alól).
+- `SettingsComponent.vue`: beállítások (jelenleg placeholder).
 
 ## Adatfolyam és state
 - `stores/liveWs.js`
@@ -26,30 +28,36 @@ A vizualizáció Vite + Vue 3 alapú , amely valós idejű adatokat jelenít meg
 - `RoverHud.vue`: tiszta presentational overlay a 3D nézethez.
 - `RoverInstruments.vue`: műszerek (sebesség, állapot, akku).
 - `NavComponent.vue`: animejs animált, ikonos sidebar.
-- `NavbarPhoneComponent.vue`: mobil navigáció.
-- `ChartComponent.vue`: ECharts wrapper (opciós, több helyen használható).
-- `HeatMap.vue`: ECharts heatmap, map mátrix 
-vizualizáció.
-- `SettingsComponent.vue`: Beállítások folytatni kell.
+- `NavPhoneComponent.vue`: mobil navigáció.
+- `RoverStatsComponent.vue`: placeholder.
+- `SettingsComponent.vue`: placeholder.
 
 ## Használt libraryk (a kódban ténylegesen)
-- `vue` – UI framework
-- `vue-router` – oldal-navigáció
-- `pinia` – state management
-- `pixi.js`, `pixi-viewport` – 2D térkép renderelés
-- `three` – 3D térkép renderelés
-- `uplot` – dinamikus chartok
-- `echarts` – heatmap / általános chartok
-- `animejs` – animációk
-- `lucide-vue-next` – ikonok
+- `vue` – UI framework, komponensek és reaktív state.
+- `vue-router` – oldal-navigáció és route alapú oldalak.
+- `pinia` – globális state management (`liveWs` store).
+- `pixi.js` – 2D térkép renderelés (sprite-ok, textúrák, canvas).
+- `pixi-viewport` – pan/zoom/drag vezérlés a 2D térképen.
+- `three` – 3D térkép renderelés (scene, camera, mesh, fények).
+- `uplot` – könnyű, gyors line chartok a dashboardon.
+- `animejs` – sidebar és welcome oldal animációk.
+- `lucide-vue-next` – ikonok a navigációhoz.
+- `marked` – markdown -> HTML konverzió a dokumentációs nézethez.
+- `github-markdown-css` – markdown stílusok a dokumentációs nézethez.
+
+## Telepített, de jelenleg nem használt
+- `echarts` – nincs aktív használat a frontenden (korábbi / tervezett chartokhoz).
+- `@tresjs/core`, `@tresjs/cientos` – nincs aktív használat (Three.js alternatív wrapper).
 
 ## Telepítés és futtatás
 
 ### macOS / linux:
-- Függőségek telepítése: `python3 setup_deps.py`
-- Szerver futtatása: `python3 run_dev_win.py`
+- Függőségek telepítése: `python3 setup/setup_deps.py`
+- Szerver futtatása: `python3 setup/run_dev.py`
 
 ### Windows:
-- Függőségek telepítése: `python setup_deps.py`
-- Szerver futtatása: `python run_dev_win.py`
+- Függőségek telepítése: `python setup/setup_deps.py`
+- Szerver futtatása: `python setup/run_dev_win.py`
 
+### Node verzió
+- Ajánlott: `node` `^20.19.0` vagy `>=22.12.0`

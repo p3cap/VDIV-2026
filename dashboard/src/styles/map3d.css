@@ -602,6 +602,11 @@
    ──────────────────────────────── */
 @media (max-width: 576px) {
 
+  .map3d-page {
+    margin-top: var(--navbar-h);
+    height: calc(100vh - var(--navbar-h));
+  }
+
   /* ── Instruments → fixed bottom bar ── */
   .map3d-page .instruments-anchor {
     position: fixed;
@@ -686,18 +691,23 @@
     pointer-events: auto;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--r-md);
     background: rgba(6, 10, 18, 0.88);
     border: var(--border-orange);
     color: var(--orange);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     cursor: pointer;
     backdrop-filter: var(--blur-md);
     box-shadow: var(--shadow-float);
     transition: background var(--t-mid);
     z-index: 30;
+  }
+
+  .hud .panel-toggle.is-open {
+    background: rgba(255, 107, 53, 0.18);
+    box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.4), var(--shadow-float);
   }
 
   .hud .panel-toggle:hover { background: rgba(255, 107, 53, 0.12); }

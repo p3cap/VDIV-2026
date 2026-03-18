@@ -69,7 +69,7 @@
   box-shadow:
     0 1px 0 rgba(0, 255, 200, 0.06),
     var(--shadow-card);
-  width: calc(100vw- var(--sidebar-w));
+  width: calc(100vw - var(--sidebar-w));
 }
 
 .dashboard .header-left {
@@ -79,7 +79,7 @@
 }
 
 .dashboard .logo-hex {
-  font-size: 20px;
+  font-size: clamp(22px, 1.8vw, 30px);
   color: var(--accent);
   animation: spin 14s linear infinite;
   display: block;
@@ -88,7 +88,7 @@
 
 .dashboard .logo-text {
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: clamp(16px, 1.4vw, 20px);
   font-weight: 900;
   letter-spacing: 0.14em;
   text-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
@@ -124,14 +124,14 @@
 }
 
 .dashboard .time-label {
-  font-size: 8px;
+  font-size: clamp(10px, 0.85vw, 12px);
   color: var(--txt-muted);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .dashboard .time-value {
-  font-size: 13px;
+  font-size: clamp(15px, 1.2vw, 18px);
   font-weight: 600;
   color: var(--txt-bright);
   font-family: var(--font-tele);
@@ -143,7 +143,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: clamp(10px, 0.85vw, 12px);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -178,8 +178,8 @@
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   grid-auto-rows: auto;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-3);
+  gap: clamp(12px, 1.4vw, var(--sp-4));
+  padding: clamp(14px, 2vw, var(--sp-5)) clamp(12px, 1.6vw, var(--sp-4));
 }
 
 /* ────────────────────────────────
@@ -189,8 +189,8 @@
   background: var(--glass-weak);
   border: var(--border-subtle);
   border-radius: var(--r-md);
-  padding: var(--sp-4);
-  min-width: 300px;
+  padding: clamp(16px, 1.8vw, 26px);
+  min-width: 320px;
   animation: fadeUp 0.6s both;
   transition:
     border-color var(--t-mid),
@@ -256,7 +256,7 @@
 }
 
 .dashboard .card-title {
-  font-size: 8px;
+  font-size: clamp(10px, 0.9vw, 12px);
   letter-spacing: 0.2em;
   color: var(--txt-muted);
   font-weight: 700;
@@ -265,7 +265,7 @@
 
 .dashboard .card-value {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: clamp(20px, 1.9vw, 28px);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -274,7 +274,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: clamp(11px, 0.95vw, 13px);
   color: var(--txt-muted);
   flex-wrap: wrap;
 }
@@ -290,7 +290,7 @@
 /* ── uPlot ── */
 .dashboard .uplot-wrap {
   width: 100%;
-  height: 170px;
+  height: clamp(180px, 18vw, 220px);
   overflow: hidden;
 }
 
@@ -306,15 +306,15 @@
    ──────────────────────────────── */
 .dashboard .status-icon-wrap {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: clamp(54px, 5vw, 66px);
+  height: clamp(54px, 5vw, 66px);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .dashboard .status-big-icon {
-  font-size: 24px;
+  font-size: clamp(28px, 2.5vw, 36px);
   position: relative;
   z-index: 1;
 }
@@ -372,7 +372,7 @@
   gap: 3px;
 }
 .dashboard .s-label {
-  font-size: 8px;
+  font-size: clamp(10px, 0.85vw, 12px);
   color: var(--txt-muted);
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -380,7 +380,7 @@
 
 .dashboard .s-text {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: clamp(19px, 1.7vw, 26px);
   font-weight: 900;
   letter-spacing: 0.06em;
 }
@@ -398,7 +398,7 @@
 }
 
 .dashboard .s-sub {
-  font-size: 10px;
+  font-size: clamp(12px, 1vw, 14px);
   color: var(--txt-muted);
 }
 
@@ -416,19 +416,19 @@
   gap: 2px;
 }
 .dashboard .stat-lbl {
-  font-size: 8px;
+  font-size: clamp(10px, 0.85vw, 12px);
   color: var(--txt-ghost);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 .dashboard .stat-val {
-  font-size: 13px;
+  font-size: clamp(16px, 1.2vw, 18px);
   font-weight: 700;
   color: var(--txt-bright);
   font-family: var(--font-tele);
 }
 .dashboard .stat-val em {
-  font-size: 9px;
+  font-size: clamp(11px, 0.95vw, 13px);
   color: var(--txt-muted);
   font-style: normal;
   margin-left: 2px;
@@ -446,7 +446,7 @@
 
 .dashboard .battery-svg {
   width: 100%;
-  max-width: 180px;
+  max-width: 210px;
   filter: drop-shadow(0 0 8px rgba(0, 255, 200, 0.1));
 }
 
@@ -457,12 +457,12 @@
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  height: 160px;
+  height: clamp(170px, 17vw, 210px);
 }
 
 .dashboard .pie-svg {
-  width: 130px;
-  height: 130px;
+  width: clamp(140px, 14vw, 170px);
+  height: clamp(140px, 14vw, 170px);
   flex-shrink: 0;
   overflow: visible;
   filter: drop-shadow(0 0 12px rgba(0, 255, 200, 0.08));
@@ -478,7 +478,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: clamp(12px, 1vw, 14px);
 }
 .dashboard .pie-leg-dot {
   width: 8px;
@@ -489,13 +489,13 @@
 .dashboard .pie-leg-label {
   color: var(--txt-secondary);
   flex: 1;
-  font-size: 10px;
+  font-size: clamp(12px, 1vw, 14px);
 }
 .dashboard .pie-leg-val {
   font-weight: 700;
   color: var(--txt-bright);
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: clamp(13px, 1.1vw, 15px);
 }
 
 /* ────────────────────────────────
@@ -504,7 +504,7 @@
 .dashboard .scatter-canvas {
   display: block;
   width: 100%;
-  height: 220px;
+  height: clamp(240px, 22vw, 300px);
   border-radius: var(--r-sm);
   background: var(--clr-void);
 }
@@ -518,11 +518,13 @@
     margin-left: 0;
     margin-top: var(--navbar-h);
   }
-
+  .dashboard .dash-header{
+    width: 100vw;
+  }
   .dashboard .dash-grid {
     grid-template-columns: repeat(6, 1fr);
-    gap: 10px;
-    padding: 10px;
+    gap: 12px;
+    padding: 12px;
   }
 
   .dashboard .status-card,
@@ -536,9 +538,30 @@
   .dashboard .chart-card {
     grid-column: span 6;
   }
+
+  .dashboard .card {
+    min-width: 0;
+    padding: 16px;
+  }
 }
 
-@media (min-width: 577px) and (max-width: 1100px) {
+@media (max-width: 900px) {
+  .dashboard .dash-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+
+  .dashboard .status-card,
+  .dashboard .battery-card,
+  .dashboard .chart-card {
+    grid-column: span 4;
+  }
+  .dashboard .storage-card,
+  .dashboard .scatter-card {
+    grid-column: span 8;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1100px) {
   .dashboard .status-card,
   .dashboard .battery-card,
   .dashboard .chart-card {

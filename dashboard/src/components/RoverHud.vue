@@ -6,7 +6,7 @@
  * Receives all display data via props — no store, no side-effects, no Three.js.
  * Renders the HUD panels on top of the 3-D canvas.
  */
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 const props = defineProps({
@@ -25,7 +25,16 @@ const props = defineProps({
 	nightHrs: { type: Number, default: 8 },
 	markers: { type: Object, default: () => ({}) },
 	pathPlan: { type: Array, default: () => [] },
+	panelLeftOpen: { type: Boolean, default: false },
+	panelRightOpen: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['toggle-left', 'toggle-right'])
+
+// Watch for changes in pathPlan and log to console
+watch(() => props.pathPlan, (newPath) => {
+	console.log('Path plan:', newPath)
+}, { deep: true })
 
 // ─── Derived display values ───────────────────────────────────────────────────
 const totalCycle = computed(() => props.dayHrs + props.nightHrs)
@@ -66,8 +75,34 @@ const storageEntries = computed(() =>
 			</span>
 		</header>
 
+		<!-- ── Panel toggles (tablet/mobile) ── -->
+		<button
+			type="button"
+			class="panel-toggle panel-toggle--left"
+			:class="{ 'is-open': panelLeftOpen }"
+			:aria-pressed="panelLeftOpen"
+			aria-label="Toggle left panel"
+			@click="emit('toggle-left')"
+		>
+			L
+		</button>
+		<button
+			type="button"
+			class="panel-toggle panel-toggle--right"
+			:class="{ 'is-open': panelRightOpen }"
+			:aria-pressed="panelRightOpen"
+			aria-label="Toggle right panel"
+			@click="emit('toggle-right')"
+		>
+			R
+		</button>
+
 		<!-- ── Left panel: Status + Battery ── -->
-		<aside class="panel panel--left" aria-label="Rover status">
+		<aside
+			class="panel panel--left"
+			:class="{ 'panel--open': panelLeftOpen }"
+			aria-label="Rover status"
+		>
 			<h2 class="panel-title">STATUS</h2>
 
 			<dl class="stat-list">
@@ -126,7 +161,11 @@ const storageEntries = computed(() =>
 		</aside>
 
 		<!-- ── Right panel: Cargo + Legend ── -->
-		<aside class="panel panel--right" aria-label="Cargo and map legend">
+		<aside
+			class="panel panel--right"
+			:class="{ 'panel--open': panelRightOpen }"
+			aria-label="Cargo and map legend"
+		>
 			<h2 class="panel-title">CARGO</h2>
 
 			<ul v-if="storageEntries.length" class="cargo-list">
