@@ -118,41 +118,6 @@ class Rover:
 		path.reverse()
 		return path, len(path)
 
-	def astar_to_any(self, start: Vector2, goals: list[Vector2]):
-		goal_set = set(goals)
-		if start in goal_set:
-			return start, [], 0
-
-		def h(node): return min(self.heuristic(node, g) for g in goals)
-
-		open_set = []
-		heapq.heappush(open_set, (0, start))
-		came_from: dict = {}
-		g_score   = {start: 0}
-		found     = None
-
-		while open_set:
-			_, current = heapq.heappop(open_set)
-			if current in goal_set:
-				found = current
-				break
-			for nb in self.get_neighbors(current):
-				t = g_score[current] + 16
-				if nb not in g_score or t < g_score[nb]:
-					came_from[nb] = current
-					g_score[nb]   = t
-					heapq.heappush(open_set, (t + h(nb), nb))
-
-		if found is None:
-			return None, [], float("inf")
-
-		path, cur = [], found
-		while cur in came_from:
-			path.append(cur)
-			cur = came_from[cur]
-		path.reverse()
-		return found, path, len(path)
-
 	def _astar_cpp(self, start: Vector2, goal: Vector2) -> list[Vector2]:
 		"""Run C++ A*. Returns path (excluding start) or [] on any failure."""
 		try:
@@ -208,8 +173,10 @@ class Rover:
 	def mine_finished(self):
 		tile_mark = self.sim.map_obj.get_tile(self.pos)
 		self.status = STATUS.IDLE
+		self.mine_process_hrs = 0.0
 		self.mined.append(self.pos._dict())
 		self.storage[tile_mark] += 1
+		self.sim.map_obj.set_tile(self.pos, self.sim.map_obj.path_marker)
 
 # ---------------- FRAME UPDATE ----------------
 

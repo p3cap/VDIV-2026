@@ -57,6 +57,22 @@ def rank_minerals(world, mineral_count: int) -> list[tuple[Vector2, float]]: # T
     return [(m, 0.0) for m in ranked[:max(0, mineral_count)]]
 
 
+def tile_step_distance(a: Vector2, b: Vector2) -> int:
+    """Tile steps needed with 8-direction movement (Chebyshev distance)."""
+    return max(abs(a.x - b.x), abs(a.y - b.y))
+
+
+def estimate_return_home_hrs(current_pos: Vector2, start_pos: Vector2, gear: GEARS = GEARS.FAST) -> float:
+    """Fast estimate of how long returning home would take from the current tile."""
+    gear_value = float(gear.value if isinstance(gear, GEARS) else gear)
+    return tile_step_distance(current_pos, start_pos) / max(1.0, gear_value)
+
+
+def return_focus_window_hrs(current_pos: Vector2, start_pos: Vector2, min_window_hrs: float = 5.0) -> float:
+    """The return-home phase starts in the last N hours, or earlier if home is farther away."""
+    return max(float(min_window_hrs), estimate_return_home_hrs(current_pos, start_pos))
+
+# Inputs
 def build_obs(
     world,
     mineral_count: int,
@@ -94,14 +110,14 @@ def build_obs(
     for i, (pos, dist) in enumerate(cache[:mineral_count]):
         base = OBS_STATIC_FIELDS + i * PER_MINERAL_FIELDS
         if USE_MINERAL_DISTANCE:
-            obs[base] = min(1.0, dist / max_d) if max_d > 0 else 0.0
+            obs[base] = len(rover._plan_path(rover.pos, pos))
             obs[base + 1] = pos.x * inv_w
             obs[base + 2] = pos.y * inv_h
         else:
             obs[base] = pos.x * inv_w
             obs[base + 1] = pos.y * inv_h
 
-    # copy() prevents accidental mutation by callers
+    # .copy() prevents accidental mutation by callers
     return obs.copy()
 
 
@@ -118,32 +134,63 @@ def compute_reward(
     penalty_base: float = 6.0,
     penalty_streak: float = 2.0,
     penalty_cap: float = 30.0,
+    travel_since_last_mine: float = 0.0,
+    return_focus_active: bool = False,
+    home_dist_before: float | None = None,
+    home_dist_after: float | None = None,
+    time_left_hrs: float | None = None,
+    return_window_hrs_value: float = 5.0,
+    max_home_dist: float = 1.0,
 ) -> tuple[float, int, int, int]:
     """Shared reward shaping with streak bookkeeping.
 
     Goals:
-    - Strongly reward mining, with a bonus for consecutive mining (streak).
+    - Strongly reward mining, with a bonus for consecutive mining (streak)
+      and extra value for collecting nearby ores in tight clusters.
     - Penalize idling (no move + no mine) heavily; do not punish active mining ticks.
     - Penalize long gaps without mining even if moving, to keep pressure on ore collection.
-    - Small time penalty to push faster collection.
+    - Switch into a sticky return-home mode near the end where only homeward
+      progress matters.
     """
-    reward = -0.05  # mild time pressure for faster mining
+    if return_focus_active:
+        before = float(home_dist_before or 0.0)
+        after = float(home_dist_after if home_dist_after is not None else before)
+        return_window_hrs_value = max(1e-6, float(return_window_hrs_value))
+        time_left_hrs = max(0.0, float(time_left_hrs if time_left_hrs is not None else return_window_hrs_value))
+
+        progress = before - after
+        urgency = 1.0 + 3.0 * (1.0 - min(1.0, time_left_hrs / return_window_hrs_value))
+
+        reward = 0.0
+        reward += progress * 42.0 * urgency
+        if progress < 0:
+            reward += progress * 24.0 * urgency
+        elif after > 0:
+            reward -= 4.0 * urgency
+        if before > 0 and after <= 0:
+            reward += 120.0 * urgency
+        if is_dead:
+            reward -= 200.0
+        return float(reward), 0, 0, 0
+
+    reward = -0.1  # mild time pressure for faster mining
 
     # Mining reward with streak bonus
     if mined_now > 0:
         mining_streak += 1
         no_mine_streak = 0
-        streak_bonus = min(36.0, 6.0 * mining_streak)
-        reward += mined_now * (32.0 + streak_bonus)
+        streak_bonus = min(30.0, 5.0 * mining_streak)
+        local_bonus = max(0.0, 18.0 - 1.25 * max(0.0, travel_since_last_mine))
+        reward += mined_now * (30.0 + streak_bonus + local_bonus)
     else:
         mining_streak = 0
         if not is_mining:
             no_mine_streak += 1
-            reward -= min(12.0, 1.5 * no_mine_streak)
+            reward -= min(14.0, 1.75 * no_mine_streak)
 
-    # Movement/battery shaping (fast but not reckless)
-    reward += dist_gain * 0.15
-    reward -= battery_cost * 0.03
+    # Travel should still happen, but shorter ore-to-ore routes are better.
+    reward -= dist_gain * 0.3
+    reward -= battery_cost * 0.05
 
     # Large idle penalty when neither moving nor mining
     if dist_gain <= 0 and mined_now <= 0 and not is_mining:

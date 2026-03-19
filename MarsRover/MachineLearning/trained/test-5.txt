@@ -22,7 +22,7 @@ return_home_min_hours=5.0
 return_home_min_mined=1
 
 # PPO
-timesteps_target=500000
+timesteps_target=100000
 device=cpu
 n_envs=16
 torch_threads=4
@@ -31,7 +31,7 @@ batch_size=2048
 n_epochs=4
 gamma=0.99
 gae_lambda=0.95
-clip_range=<function constant_fn.<locals>.func at 0x000002495FB3BEC0>
+clip_range=<function constant_fn.<locals>.func at 0x000001F57D41BEC0>
 ent_coef=0.0
 vf_coef=0.5
 learning_rate=0.0003
