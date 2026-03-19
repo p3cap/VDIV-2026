@@ -610,7 +610,7 @@
   /* ── Instruments → fixed bottom bar ── */
   .map3d-page .instruments-anchor {
     position: fixed;
-    bottom: 0;
+    bottom: 10;
     right: 0;
     left: 0;
     width: 100%;

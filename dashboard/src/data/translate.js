@@ -1,12 +1,23 @@
-// dictionary
+// reactive for language change
+import { ref } from 'vue'
 import translationDictonary from './langDictionary.js'
 
-function translateKey(translationKey) {
-  const lang = "HU"
-  const key = translationDictonary[translationKey]
-  let translation = key ? key[lang] : translationKey
+const currentLang = ref('HU')
 
-  return translation
+function translateKey(key, params = {}) {
+  const entry = translationDictonary[key]
+  let text = entry ? entry[currentLang.value] : key
+
+  // paraméter behelyettesítés
+  Object.keys(params).forEach(param => {
+    text = text.replace(`{${param}}`, params[param])
+  })
+
+  return text
 }
 
-export { translateKey }
+function setLanguage(lang) {
+  currentLang.value = lang
+}
+
+export { translateKey, currentLang, setLanguage }

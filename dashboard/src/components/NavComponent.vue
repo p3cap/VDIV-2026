@@ -3,15 +3,16 @@ import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Settings, Earth, ChartNoAxesCombined, House, Rotate3d } from 'lucide-vue-next'
 import { animate, stagger } from 'animejs'
+import { translateKey as t } from '@/data/translate.js'
 
 const isExpanded = ref(false)
 
 const menuItems = [
-		{ id: 'welcome', to: '/', icon: House, label: 'Welcome' },
-		{ id: 'map', to: '/map', icon: Earth, label: 'Map' },
-		{ id: 'map3d', to: '/map3d', icon: Rotate3d, label: '3d Map' },
-		{ id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined, label: 'Dashboard' },
-		{ id: 'settings', to: '/settings', icon: Settings, label: 'Settings' },
+		{ id: 'welcome', to: '/', icon: House, label: 'nav_welcome' },
+		{ id: 'map', to: '/map', icon: Earth, label: 'nav_map' },
+		{ id: 'map3d', to: '/map3d', icon: Rotate3d, label: 'nav_map3d' },
+		{ id: 'dashboard', to: '/dashboard', icon: ChartNoAxesCombined, label: 'nav_dashboard' },
+		{ id: 'settings', to: '/settings', icon: Settings, label: 'nav_settings' },
 ]
 
 const sidebarRef = ref(null)
@@ -92,7 +93,7 @@ onMounted(() => {
 												class="menu-label"
 												ref="el => { if (el) labelRefs[index] = el }"
 										>
-												{{ item.label }}
+												{{ t(item.label) }}
 										</span>
 								</RouterLink>
 						</li>
