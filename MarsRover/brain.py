@@ -1,25 +1,34 @@
 """
 Mars Rover – Vadász Dénes Informatika Verseny 2026
 
-Feladatleírás szerinti energiamodell:
-  1 tick = fél óra
-  Sebesség v = 1/2/3 blokk/tick
-  Mozgási fogyasztás: E = 2 * v² /tick
-    v=1: 2/tick   v=2: 8/tick   v=3: 18/tick
+Energiamodell (1 tick = fél óra):
+  v=1: 2/tick bruttó  | nappal: -8 nettó (töltődik) | éjjel: +2
+  v=2: 8/tick bruttó  | nappal: -2 nettó (töltődik) | éjjel: +8
+  v=3: 18/tick bruttó | nappal: +8 nettó (merül)    | éjjel: +18
   Nappal töltés: +10/tick
-  Bányászás: 2/tick, 1 tick ideig tart
+  Bányászás: 2/tick, 1 tick
   Standby: 1/tick
 
-Nappal nettó mozgás:
-  v=1: 2-10 = -8  (töltődik!)
-  v=2: 8-10 = -2  (töltődik!)
-  v=3: 18-10 = +8 (merül)
+JAVÍTÁSOK:
+  1. move_to – gear igazítása a maradék lépésszámhoz:
+       Ha csak 1 blokk maradt → gear=1 (SLOW, 2 energia)
+       Ha csak 2 blokk maradt → gear=2 (NORMAL, 8 energia)
+       Ha 3+ blokk maradt    → a tervezett speed marad
+     Ez megakadályozza hogy pl. 1 blokknyi mozgásért 18 energiát vonjon le.
 
-Éjjel nettó mozgás:
-  v=1: +2   v=2: +8   v=3: +18
+  2. Klaszter logika – choose_ore klasztert is figyelembe vesz:
+       Minden jelölt érc körül CLUSTER_RADIUS-on belüli szomszédokat számol.
+       score = ticks - neighbor_count × CLUSTER_BONUS
+       Kisebb score = vonzóbb cél → klasztereket preferálja.
 
-Döntési logika: mindig a LEGKÖZELEBBI elérhető ércet választja.
-Az energiakorlát kizárja a túl messze lévő célokat.
+  3. send_live mined – saját _mined_log lista:
+       rover.mined megbízhatatlan (nem mindig frissül).
+       mine_here() sikeres bányászás után log_mined()-et hív,
+       ami a saját _mined_log listába írja az adatot.
+       send_live() ezt a listát küldi a dashboardnak.
+       
+  4. mine_here – gear visszaállítása 1-re bányászás előtt:
+       Álló rovernél nincs értelme 3-as geart tartani.
 """
 
 from math import ceil
@@ -54,7 +63,7 @@ USE_SERVER   = True
 
 BASE_POS = (0, 0)
 
-# Energiamodell – feladatleírás szerint
+# Energiamodell
 BATTERY_CAP  = 100
 ENERGY_K     = 2
 DAY_CHARGE   = 10
@@ -64,10 +73,17 @@ STANDBY_COST = 1
 # Biztonsági tartalékok
 DAY_RESERVE   = 5
 NIGHT_RESERVE = 15
-RETURN_MARGIN = 1.1   # 10% margó a hazaútra
-END_TICKS     = 30    # ennyi tick maradt -> hazamegyünk
+RETURN_MARGIN = 1.1
+END_TICKS     = 30
+
+# Klaszter konfiguráció
+CLUSTER_RADIUS = 5    # ekkora körön belüli ércek számítanak klaszternek
+CLUSTER_BONUS  = 2    # ennyivel csökkenti a score-t minden extra szomszéd
 
 ORE_VALUES = {"Y": 1, "G": 1, "B": 1}
+
+# Saját mined log – rover.mined helyett ezt használjuk
+_mined_log = []
 
 # ═══════════════════════════════════════
 # SZIMULÁCIÓ
@@ -114,7 +130,7 @@ def current_speed():
     for s, g in GEAR_BY_SPEED.items():
         if g == rover.gear:
             return s
-    return 2
+    return 1
 
 # ═══════════════════════════════════════
 # IDŐ
@@ -158,6 +174,7 @@ def net_move(speed, day):
     return move_cost(speed) - (DAY_CHARGE if day else 0)
 
 def net_mine(day):
+    """Bányászás nettó energiaváltozása 1 tickre. Pozitív = merül."""
     return float(MINE_COST) - (DAY_CHARGE if day else 0)
 
 def ticks_needed(dist_blocks, speed):
@@ -165,15 +182,17 @@ def ticks_needed(dist_blocks, speed):
 
 def battery_after(bat, dist_blocks, speed, day):
     """Várható akkuszint az odaút + 1 tick bányászás után."""
-    t     = ticks_needed(dist_blocks, speed)
-    delta = net_move(speed, day) * t + net_mine(day)
-    return max(0.0, min(BATTERY_CAP, bat - delta))
+    t            = ticks_needed(dist_blocks, speed)
+    travel_delta = net_move(speed, day) * t
+    mine_delta   = net_mine(day)
+    total_delta  = travel_delta + mine_delta
+    return max(0.0, min(BATTERY_CAP, bat - total_delta))
 
 def energy_for_return(dist_to_base, day):
     """
-    Mennyi akku kell a hazaúthoz.
-    Nappal: töltődik menet közben, elég a tartalék.
-    Éjjel: v=1, nettó +2/tick, konzervatív becslés.
+    Mennyi akku szükséges a hazaúthoz.
+    Nappal v=1/v=2 töltődik → csak a tartalék kell.
+    Éjjel v=1-gyel (2/tick): 2 × ceil(dist × margin) + tartalék.
     """
     if day:
         return reserve()
@@ -181,10 +200,10 @@ def energy_for_return(dist_to_base, day):
     return 2.0 * t + reserve()
 
 def safe_to_go(bat, ore_dist, base_from_ore, speed, day):
-    """Igaz ha odaér + kibányász + visszaér."""
-    after  = battery_after(bat, ore_dist, speed, day)
-    needed = energy_for_return(base_from_ore, day)
-    return after >= needed
+    """Igaz ha: odaér + kibányász + visszaér."""
+    bat_after_mine    = battery_after(bat, ore_dist, speed, day)
+    needed_for_return = energy_for_return(base_from_ore, day)
+    return bat_after_mine >= needed_for_return
 
 # ═══════════════════════════════════════
 # PATH CACHE
@@ -234,28 +253,60 @@ def remove_ore(ores, pos):
 # ═══════════════════════════════════════
 
 def pick_speed(ore_dist, bat, base_dist, day):
-    """Legnagyobb biztonságos sebesség (3>2>1), vagy None."""
-    for speed in (3, 2, 1):
+    """
+    Legnagyobb biztonságos sebesség, vagy None.
+    Nappal: 3→2→1 sorrendben próbál.
+    Éjjel:  max v=2 (v=3 = 18/tick, túl kockázatos).
+    """
+    candidates = (3, 2, 1) if day else (2, 1)
+    for speed in candidates:
         if safe_to_go(bat, ore_dist, base_dist, speed, day):
             return speed
     return None
 
 # ═══════════════════════════════════════
-# CÉLVÁLASZTÁS – LEGKÖZELEBBI ÉRC
+# KLASZTER LOGIKA
 # ═══════════════════════════════════════
+
+def find_cluster(center_pos, ores, radius=CLUSTER_RADIUS):
+    """
+    Megkeresi a center_pos közelében (radius blokkon belül) lévő érceket
+    az aktuális ores listából.
+    Gyors Manhattan pre-filter, majd pontos path_dist ellenőrzés.
+    Visszaadja a listát (távolság, ore) párként, távolság szerint rendezve.
+    Maga a center_pos-on lévő érc is benne lehet (d=0).
+    """
+    cluster = []
+    cx, cy  = center_pos
+    for ore in ores:
+        ox, oy = ore["pos"]
+        if abs(ox - cx) + abs(oy - cy) > radius * 2:
+            continue
+        d = path_dist(center_pos, ore["pos"])
+        if d is not None and d <= radius:
+            cluster.append((d, ore))
+    cluster.sort(key=lambda x: x[0])
+    return cluster
 
 def choose_ore(pos, ores, bat):
     """
-    Greedy: a legkevesebb tickbe kerülő elérhető ércet választja.
-    Elérhető = van elég akku oda + bányász + vissza.
-    Nincs klaszter logika, nincs ugrálás.
+    Klaszter-tudatos célválasztás.
+
+    Minden elérhető ércre kiszámolja:
+      score = ticks_to_ore - neighbor_count × CLUSTER_BONUS
+
+    neighbor_count = hány más érc van CLUSTER_RADIUS-on belül az ércnél.
+    Kisebb score = vonzóbb cél → klaszteres területeket preferálja.
+
+    FONTOS: ez csak az ELSŐ célt adja vissza.
+    A klaszter többi tagját collect_cluster() bányássza ki sorban.
     """
     day        = is_day()
-    best_ticks = None
+    best_score = None
     best       = None
 
     for ore in ores:
-        d_ore  = path_dist(pos, ore["pos"])
+        d_ore = path_dist(pos, ore["pos"])
         if d_ore is None:
             continue
 
@@ -268,21 +319,120 @@ def choose_ore(pos, ores, bat):
             continue
 
         t = ticks_needed(d_ore, speed)
-        if best_ticks is None or t < best_ticks:
-            best_ticks = t
+
+        neighbors      = find_cluster(ore["pos"], ores, CLUSTER_RADIUS)
+        # Önmaga (d=0) nem számít szomszédnak
+        neighbor_count = sum(1 for d, o in neighbors if o["pos"] != ore["pos"])
+
+        score = t - neighbor_count * CLUSTER_BONUS
+
+        if best_score is None or score < best_score:
+            best_score = score
             best = {
-                "ore":   ore,
-                "path":  astar(pos, ore["pos"]),
-                "dist":  d_ore,
-                "ticks": t,
-                "speed": speed,
-                "after": battery_after(bat, d_ore, speed, day),
+                "ore":     ore,
+                "path":    astar(pos, ore["pos"]),
+                "dist":    d_ore,
+                "ticks":   t,
+                "speed":   speed,
+                "after":   battery_after(bat, d_ore, speed, day),
+                "cluster": neighbor_count,
+                "score":   score,
             }
 
     return best
 
+def collect_cluster(first_ore_pos, ores, mined_count):
+    """
+    Miután a rover megérkezett az első érchez és kibányászta azt,
+    ez a függvény végigbányássza a klaszter összes maradék tagját.
+
+    FIX: A klaszter tagjait az ELSŐ érc pozíciójától mérjük (first_ore_pos),
+    nem az aktuális roverpozíciótól. Ez megakadályozza hogy a rover
+    kilépjen a klaszterből ha néhány blokkot mozgott a klaszteren belül.
+
+    A "maradt a klaszterből" lista az elején rögzítődik (snapshot),
+    majd a rover sorban végigmegy rajtuk legközelebbi-először sorrendben.
+
+    Visszatér: (sikeres: bool, kibányászott db száma)
+    """
+    collected = 0
+
+    # Klaszter snapshot: az első érc körüli CLUSTER_RADIUS-on belüli
+    # összes érc rögzítése az induláskor. Ez a lista nem változik közben
+    # (kivéve amit kibányászunk – remove_ore törli az ores-ból).
+    cluster_members = set(
+        o["pos"]
+        for d, o in find_cluster(first_ore_pos, ores, CLUSTER_RADIUS)
+        if o["pos"] != first_ore_pos
+    )
+    print(f"  Klaszter snapshot: {len(cluster_members)} tag")
+
+    while True:
+        pos = (rover.pos.x, rover.pos.y)
+
+        # Hazaút ellenőrzés minden érc előtt
+        if must_go_home(pos, rover.battery):
+            return True, collected
+
+        # Csak a klaszter eredeti tagjait nézzük (akik még az ores-ban vannak)
+        remaining_members = [o for o in ores if o["pos"] in cluster_members]
+
+        if not remaining_members:
+            # Klaszter teljesen kész
+            break
+
+        # Legközelebbi klasztertag a jelenlegi pozícióból
+        best_d    = None
+        best_ore  = None
+        for o in remaining_members:
+            d = path_dist(pos, o["pos"])
+            if d is not None and (best_d is None or d < best_d):
+                best_d   = d
+                best_ore = o
+
+        if best_ore is None:
+            break
+
+        nearby = [(best_d, best_ore)]  # kompatibilis a régi struktúrával
+
+        d_next, next_ore = best_d, best_ore
+
+        d_base = path_dist(next_ore["pos"], BASE_POS)
+        if d_base is None:
+            break
+
+        speed = pick_speed(d_next, rover.battery, d_base, is_day())
+        if speed is None:
+            # Nincs elég akku a következő érchez – hagyjuk abba
+            print(f"  Klaszter: nincs eleg akku a kovetkezohoz {next_ore['pos']}, megszakitas")
+            break
+
+        path = astar(pos, next_ore["pos"])
+        if not path:
+            # Nincs útvonal (nem valószínű, de kezeljük)
+            break
+
+        print(
+            f"  Klaszter -> {next_ore['pos']} ({next_ore['type']}) | "
+            f"dist={d_next} speed={speed} | "
+            f"bat: {rover.battery:.1f}"
+        )
+
+        if not move_to(next_ore["pos"], path, speed):
+            return False, collected
+
+        if not mine_here(next_ore["pos"], next_ore["type"], path):
+            return False, collected
+
+        remove_ore(ores, next_ore["pos"])
+        collected += 1
+
+        print(f"  Klaszter [{collected}] akku={rover.battery:.1f} maradt={len(ores)}")
+
+    return True, collected
+
 # ═══════════════════════════════════════
-# BACKEND
+# BACKEND / LOGGING
 # ═══════════════════════════════════════
 
 def refresh():
@@ -299,7 +449,7 @@ def send_setup():
     except Exception as e:
         print("send_setup hiba:", e)
 
-def send_live(path_plan=None):
+def send_live(path_plan=None, status_override=None, speed_override=None):
     if not USE_SERVER:
         return
     try:
@@ -311,23 +461,19 @@ def send_live(path_plan=None):
                 break
 
         day = is_day()
-        if rover.status == STATUS.MINE:
+        # Ha explicit override jön (pl. world_step-től), azt használjuk.
+        # Ez javítja azt a hibát, hogy mozgás közben idle-t mutatott:
+        # a Sim.step() után a rover már idle státuszra áll, de mi tudjuk
+        # hogy az adott tickben mozgott/bányászott.
+        eff_status = status_override if status_override is not None else rover.status
+        eff_speed  = speed_override  if speed_override  is not None else current_speed()
+        if eff_status == STATUS.MINE:
             cons = MINE_COST
-        elif rover.status == STATUS.MOVE:
-            cons = move_cost(current_speed())
+        elif eff_status == STATUS.MOVE:
+            cons = move_cost(eff_speed)
         else:
             cons = STANDBY_COST
         prod = DAY_CHARGE if day else 0
-
-        raw_mined = getattr(rover, "mined", [])
-        if raw_mined and not isinstance(raw_mined[0], dict):
-            mined = [
-                {"x": int(m.x), "y": int(m.y)} if hasattr(m, "x")
-                else {"x": int(m[0]), "y": int(m[1])}
-                for m in raw_mined
-            ]
-        else:
-            mined = raw_mined
 
         payload = {
             "time_of_day":              float(time_of_day()),
@@ -335,10 +481,10 @@ def send_live(path_plan=None):
             "rover_position":           {"x": int(rover.pos.x), "y": int(rover.pos.y)},
             "rover_battery":            float(rover.battery),
             "rover_storage":            {k: int(storage.get(k, 0)) for k in ("B", "Y", "G")},
-            "rover_speed":              int(current_speed()),
+            "rover_speed":              int(eff_speed),
             "rover_status": (
-                "mine" if rover.status == STATUS.MINE else
-                "move" if rover.status == STATUS.MOVE else
+                "mine" if eff_status == STATUS.MINE else
+                "move" if eff_status == STATUS.MOVE else
                 "dead" if rover.status == STATUS.DEAD else
                 "idle"
             ),
@@ -346,21 +492,35 @@ def send_live(path_plan=None):
             "rover_path_plan":          path_plan or [],
             "rover_energy_consumption": float(cons),
             "rover_energy_produce":     float(prod),
-            "rover_mined":              mined,
+            # JAVÍTÁS: saját _mined_log, nem a megbízhatatlan rover.mined
+            "rover_mined":              list(_mined_log),
         }
         logger.send_live(payload)
     except Exception as e:
         print("send_live hiba:", type(e).__name__, e)
 
+def log_mined(pos, ore_type):
+    """Kibányászott érc rögzítése. Ezt hívja mine_here() sikeres bányászás után."""
+    _mined_log.append({
+        "x":    int(pos[0]),
+        "y":    int(pos[1]),
+        "type": ore_type,
+        "time": float(elapsed_hrs()),
+    })
+
 # ═══════════════════════════════════════
 # WORLD STEP
 # ═══════════════════════════════════════
 
-def world_step(path_plan=None):
+def world_step(path_plan=None, status_override=None, speed_override=None):
     refresh()
+    # Státuszt és sebességet a step ELŐTT rögzítjük, mert utána a szimuláció
+    # már idle-re állíthatja a rovert (ezért mutatott idle-t mozgás közben).
+    pre_status = status_override or rover.status
+    pre_speed  = speed_override  or current_speed()
     Sim.step(sleep=True)
     refresh()
-    send_live(path_plan)
+    send_live(path_plan, status_override=pre_status, speed_override=pre_speed)
 
 # ═══════════════════════════════════════
 # MOZGÁS
@@ -368,49 +528,54 @@ def world_step(path_plan=None):
 
 def move_to(target, path, speed):
     """
-    Kézzel lépteti végig a path-t, tickenként pontosan 'speed' blokkot haladva.
+    Végiglépteti a path-t tickenként, a maradék lépésszámhoz igazított gearrel.
 
-    A feladatleírás szerint v=2 azt jelenti: 1 tick alatt 2 blokk.
-    Ezért a path-t 'speed' méretű szeletekre vágjuk, és minden szelet
-    VÉGPONTJÁRA hívjuk a path_find_to-t, majd 1 tick-et lépünk.
+    JAVÍTÁS – actual_speed = min(speed, steps_remaining):
+      Ha speed=3 de csak 2 blokk van hátra → gear=2 (8 energia, nem 18)
+      Ha speed=3 de csak 1 blokk van hátra → gear=1 (2 energia, nem 18)
+      Ha speed=2 de csak 1 blokk van hátra → gear=1 (2 energia, nem 8)
 
-    Így garantált hogy:
-      - 1 tick alatt pontosan 'speed' blokk (vagy kevesebb az utolsó ticknél)
-      - Nem ugrik át blokkokat
-      - Az energiafogyasztás pontosan stimmel
+    A feladatleírás szerint a sebesség = "blokk/fél óra", tehát
+    ha 1 blokkot teszünk meg egy tickben, a tényleges sebesség 1,
+    függetlenül attól, milyen gearben volt beállítva a rover.
     """
     plan = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
 
-    # A path az A*-tól jön: path[0] = start, path[-1] = cél
-    # Lépjük végig 'speed' lépésenként
     remaining = list(path)
 
-    # Levágjuk a start pozíciót ha az egyenlő a rover pozíciójával
+    # Levágjuk a start pozíciót
     if remaining and (remaining[0][0], remaining[0][1]) == (rover.pos.x, rover.pos.y):
         remaining = remaining[1:]
 
     timeout = 5000
 
     while remaining:
-        # Következő tick célpontja: 'speed' lépéssel arrébb, vagy a path vége
-        step_end = remaining[min(speed, len(remaining)) - 1]
+        steps_left = len(remaining)
+
+        # JAVÍTÁS: ténylegesen megtett blokkszámhoz igazított gear
+        actual_speed = max(1, min(speed, steps_left))
+
+        # A tick végpontja: actual_speed lépéssel arrébb (vagy a path vége)
+        step_end    = remaining[actual_speed - 1]
         step_target = (step_end[0], step_end[1])
 
-        set_gear(speed)
+        set_gear(actual_speed)
         rover.path_find_to(Vector2(step_target[0], step_target[1]))
-        world_step(plan)
+        world_step(plan, status_override=STATUS.MOVE, speed_override=actual_speed)
 
         if rover.battery <= 0:
             print("Lemerult mozgas kozben.")
             return False
 
-        # Levágjuk a már megtett lépéseket
+        # Levágjuk a megtett lépéseket a remaining listából
         rover_pos = (rover.pos.x, rover.pos.y)
+
+        # Közvetlen egyezés az elejéről
         while remaining and (remaining[0][0], remaining[0][1]) == rover_pos:
             remaining = remaining[1:]
-        # Ha a rover tovább lépett (speed > 1), vágjuk le a közbülső pontokat is
+
+        # Ha speed>1 és a rover közbülső ponton áll, keressük meg
         if remaining:
-            # megkeressük hol tartunk a path-ban
             idx = None
             for i, p in enumerate(remaining):
                 if (p[0], p[1]) == rover_pos:
@@ -424,11 +589,11 @@ def move_to(target, path, speed):
             print("Mozgas timeout.")
             return False
 
-    # Végső ellenőrzés
+    # Végső korrekció ha egy blokkal eltért
     if rover.pos.x != target[0] or rover.pos.y != target[1]:
-        # Lehet hogy egy lépéssel túlment – egy utolsó path_find_to a célra
+        set_gear(1)
         rover.path_find_to(Vector2(target[0], target[1]))
-        world_step(plan)
+        world_step(plan, status_override=STATUS.MOVE, speed_override=1)
 
     return True
 
@@ -436,9 +601,30 @@ def move_to(target, path, speed):
 # BÁNYÁSZÁS
 # ═══════════════════════════════════════
 
-def mine_here(target, path):
-    plan    = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
+def mine_here(ore_pos, ore_type, path):
+    """
+    Bányászás az aktuális pozícióban.
+
+    JAVÍTÁS 1 – gear visszaállítása 1-re:
+      Álló rovernél nincs értelme magasabb gearben lenni.
+      set_gear(1) hívás rover.mine() előtt.
+
+    JAVÍTÁS 2 – mined státusz azonnali küldése:
+      rover.mine() után azonnal send_live()-t hívunk,
+      hogy a dashboard "mine" státuszt kapjon még a world_step előtt.
+
+    JAVÍTÁS 3 – log_mined() hívás sikeres bányászás után:
+      A saját _mined_log-ba kerül az érc adatai (x, y, type, time).
+      send_live() ezt a listát küldi, nem a rover.mined-et.
+    """
+    plan = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
+
+    # JAVÍTÁS 1: gear visszaállítása 1-re bányászás előtt
+    set_gear(1)
     rover.mine()
+
+    # Azonnali "mine" státusz küldése override-dal
+    send_live(plan, status_override=STATUS.MINE)
 
     stuck   = 0
     last_st = rover.status
@@ -446,7 +632,7 @@ def mine_here(target, path):
     timeout = 5000
 
     while rover.status == STATUS.MINE:
-        world_step(plan)
+        world_step(plan, status_override=STATUS.MINE)
 
         if rover.battery <= 0:
             print("Lemerult banyaszas kozben.")
@@ -465,6 +651,12 @@ def mine_here(target, path):
         if timeout <= 0:
             print("Banyaszas timeout.")
             return False
+
+    # JAVÍTÁS 3: sikeres bányászás → saját log + azonnali küldés
+    log_mined(ore_pos, ore_type)
+    # rover.last_mined: a szimuláció belső állapotához szükséges (doc3-ból)
+    rover.last_mined = Vector2(ore_pos[0], ore_pos[1])
+    send_live(plan)
 
     return True
 
@@ -521,6 +713,11 @@ def main():
               f"nappal {net_move(v,True):+.0f} | "
               f"ejjel {net_move(v,False):+.0f}")
     print()
+    print("Sebesség logika:")
+    print("  Nappal: v=3>v=2>v=1 (ha biztonságos)")
+    print("  Éjjel:  max v=2 (v=3 kizárva)")
+    print(f"Klaszter: r={CLUSTER_RADIUS} blokk, bonus={CLUSTER_BONUS} tick/szomszed")
+    print()
 
     send_setup()
     send_live()
@@ -551,7 +748,8 @@ def main():
         print(
             f"-> {ore['pos']} ({ore['type']}) | "
             f"dist={target['dist']} ticks={target['ticks']} "
-            f"speed={target['speed']} | "
+            f"speed={target['speed']} score={target['score']:.1f} "
+            f"cluster={target['cluster']} | "
             f"bat: {rover.battery:.1f}->{target['after']:.1f} | "
             f"{'nap' if is_day() else 'ej'}"
         )
@@ -559,14 +757,20 @@ def main():
         if not move_to(ore["pos"], target["path"], target["speed"]):
             break
 
-        if not mine_here(ore["pos"], target["path"]):
+        if not mine_here(ore["pos"], ore["type"], target["path"]):
             break
 
-        rover.last_mined = Vector2(ore["pos"][0], ore["pos"][1])
         remove_ore(ores, ore["pos"])
         mined += 1
-
         print(f"[{mined}] akku={rover.battery:.1f} maradt={len(ores)} {'nap' if is_day() else 'ej'}")
+
+        # Ha volt klaszter, bányásszuk ki az összes szomszédot is
+        if target["cluster"] > 0:
+            print(f"  Klaszter indul ({target['cluster']} szomszed a kozelben)")
+            ok, extra = collect_cluster(ore["pos"], ores, mined)
+            mined += extra
+            if not ok:
+                break
 
     if not went_home:
         if (rover.pos.x, rover.pos.y) != BASE_POS:
@@ -587,6 +791,7 @@ def main():
     print(f"Vegso akku   : {rover.battery:.1f}")
     print(f"Eltelt       : {elapsed_hrs():.1f} h")
     print(f"Cache        : {len(_cache)} bejegyzes")
+    print(f"Mined log    : {len(_mined_log)} bejegyzes")
     pos = (rover.pos.x, rover.pos.y)
     print(f"Bazis        : {'OK' if pos == BASE_POS else 'NEM OK'} {pos}")
     print("=" * 50)
