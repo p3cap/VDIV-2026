@@ -111,8 +111,8 @@
 
 .map-wrapper .texture-switcher {
   position: absolute;
-  top: var(--sp-3);
-  left: var(--sidebar-w);
+  bottom: var(--sp-3);
+  left: calc(var(--sidebar-w) + var(--sp-4));
   z-index: 5;
   display: flex;
   align-items: center;
@@ -127,6 +127,27 @@
   text-transform: uppercase;
   color: var(--txt-muted);
   backdrop-filter: var(--blur-sm);
+}
+
+@media (max-width: 1024px) {
+  .map-wrapper .texture-switcher {
+    top: 52px;
+    left: 50%;
+    bottom: auto;
+    transform: translateX(-50%);
+    padding: 6px 10px;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 576px) {
+  .map-wrapper .texture-switcher {
+    top: 44px;
+    padding: 5px 9px;
+    font-size: 0.58rem;
+  }
 }
 
 .map-wrapper .texture-switcher label {

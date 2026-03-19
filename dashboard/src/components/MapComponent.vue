@@ -45,7 +45,7 @@ const props = defineProps({
 const pixiContainer = ref(null)
 const initialized = ref(false)
 const cellSize = ref(16)
-const activeTexturePack = ref('pixelart')
+const activeTexturePack = ref('default')
 const texturePacks = ['default', 'pixelart', 'minecraft']
 
 let app = null
@@ -131,7 +131,7 @@ onUnmounted(() => {
 
 function formatTexturePack(pack) {
     const labels = {
-        default: 'Default',
+        default: 'Default (Colors)',
         pixelart: 'Pixel Art',
         minecraft: 'Minecraft',
     }
@@ -149,7 +149,12 @@ function resolveTextureUrl(pack, key) {
 
 async function loadTextures(pack) {
     const map = {}
+    const useTextures = pack !== 'default'
     for (const [cellType, key] of Object.entries(textureKeysByCell)) {
+        if (!useTextures) {
+            map[cellType] = null
+            continue
+        }
         const url = resolveTextureUrl(pack, key)
         try {
             map[cellType] = url ? await Assets.load(url) : null
@@ -157,7 +162,7 @@ async function loadTextures(pack) {
             map[cellType] = null
         }
     }
-    const roverUrl = resolveTextureUrl(pack, 'rover')
+    const roverUrl = useTextures ? resolveTextureUrl(pack, 'rover') : defaultTextureUrls.rover
     let roverTex = null
     try {
         roverTex = roverUrl ? await Assets.load(roverUrl) : null
