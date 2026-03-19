@@ -270,12 +270,57 @@ function drawPath() {
     pathGraphics.clear()
     if (!props.pathPlan?.length) return
 
-    let currentX = props.roverPosition.x
-    let currentY = props.roverPosition.y
+    const isRelative = isRelativePath(props.pathPlan)
+    const roverX = props.roverPosition.x
+    const roverY = props.roverPosition.y
 
-    for (const step of props.pathPlan) {
-        const nextX = currentX + step.x
-        const nextY = currentY + step.y
+    if (isRelative) {
+        let currentX = roverX
+        let currentY = roverY
+        for (const step of props.pathPlan) {
+            const { x, y } = normalizeStep(step)
+            const nextX = currentX + x
+            const nextY = currentY + y
+
+            if (nextX === currentX && nextY === currentY) {
+                continue
+            }
+
+            pathGraphics
+                .moveTo(
+                    currentX * cellSize.value + cellSize.value / 2,
+                    currentY * cellSize.value + cellSize.value / 2,
+                )
+                .lineTo(
+                    nextX * cellSize.value + cellSize.value / 2,
+                    nextY * cellSize.value + cellSize.value / 2,
+                )
+                .stroke({ width: 3, color: 0x00ffcc, alpha: 0.8, cap: 'round' })
+
+            currentX = nextX
+            currentY = nextY
+        }
+        return
+    }
+
+    const points = props.pathPlan.map(normalizeStep).filter(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
+    if (points.length < 2) return
+
+    // Ha az első pont a rover pozija, indulhatunk onnan; különben ne húzzunk vonalat rover->start között.
+    let startIndex = 0
+    let currentX = points[0].x
+    let currentY = points[0].y
+    if (currentX === roverX && currentY === roverY) {
+        startIndex = 1
+    }
+
+    for (let i = startIndex; i < points.length; i++) {
+        const nextX = points[i].x
+        const nextY = points[i].y
+
+        if (nextX === currentX && nextY === currentY) {
+            continue
+        }
 
         pathGraphics
             .moveTo(
@@ -291,6 +336,21 @@ function drawPath() {
         currentX = nextX
         currentY = nextY
     }
+}
+
+function normalizeStep(step) {
+    if (Array.isArray(step) && step.length >= 2) {
+        return { x: Number(step[0]), y: Number(step[1]) }
+    }
+    return { x: Number(step?.x ?? 0), y: Number(step?.y ?? 0) }
+}
+
+function isRelativePath(pathPlan) {
+    if (!Array.isArray(pathPlan) || pathPlan.length === 0) return true
+    return pathPlan.every((step) => {
+        const { x, y } = normalizeStep(step)
+        return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) <= 1 && Math.abs(y) <= 1
+    })
 }
 
 function onResize() {

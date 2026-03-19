@@ -477,7 +477,7 @@ def remove_mined_ore(ores, pos_xy):
 # C++ A* KAPCSOLAT
 
 def get_cpp_path(start_xy, goal_xy):
-    #Meghívja a C++ A* útkeresőt.
+    #Meghívja a C++ A* útkeresőt. Abszolút pontokat ad vissza (start nélkül).
     
     if not CPP_AVAILABLE:
         print("C++ A* nem elérhető, üres path visszaadása")
@@ -504,7 +504,8 @@ def get_path_and_length(start_xy, goal_xy):
         print(f"Nincs útvonal {start_xy} -> {goal_xy}")
         return [], None
 
-    return path, len(path) - 1
+    # path már start nélküli abszolút lista, a lépésszám = len(path)
+    return path, len(path)
 
 # KLASZTER LOGIKA
 

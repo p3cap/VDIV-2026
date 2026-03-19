@@ -152,6 +152,21 @@ function clearGroup(g) {
   while (g.children.length) g.remove(g.children[g.children.length - 1])
 }
 
+function normalizeStep(step) {
+  if (Array.isArray(step) && step.length >= 2) {
+    return { x: Number(step[0]), y: Number(step[1]) }
+  }
+  return { x: Number(step?.x ?? 0), y: Number(step?.y ?? 0) }
+}
+
+function isRelativePath(pathPlan) {
+  if (!Array.isArray(pathPlan) || pathPlan.length === 0) return true
+  return pathPlan.every((step) => {
+    const { x, y } = normalizeStep(step)
+    return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) <= 1 && Math.abs(y) <= 1
+  })
+}
+
 // ─── Cell factories ───────────────────────────────────────────────────────────
 function makeTile(gx, gy) {
   const m = new Mesh(S.gTile, S.mTile)
@@ -294,12 +309,32 @@ function buildPath() {
 
   const pts = []
   let prevKey = null
-  for (const p of plan) {
-    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
-    const k = `${p.x},${p.y}`
-    if (k === prevKey) continue
-    prevKey = k
-    pts.push(toWorld(p.x, p.y, 0.05))
+  const isRelative = isRelativePath(plan)
+
+  if (isRelative) {
+    let currentX = Number(props.roverPosition?.x ?? 0)
+    let currentY = Number(props.roverPosition?.y ?? 0)
+    for (const step of plan) {
+      const { x, y } = normalizeStep(step)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      const nextX = currentX + x
+      const nextY = currentY + y
+      const k = `${nextX},${nextY}`
+      if (k === prevKey) { currentX = nextX; currentY = nextY; continue }
+      prevKey = k
+      pts.push(toWorld(nextX, nextY, 0.05))
+      currentX = nextX
+      currentY = nextY
+    }
+  } else {
+    for (const p of plan) {
+      const { x, y } = normalizeStep(p)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      const k = `${x},${y}`
+      if (k === prevKey) continue
+      prevKey = k
+      pts.push(toWorld(x, y, 0.05))
+    }
   }
   if (pts.length < 2) { markDirty(); return }
 
