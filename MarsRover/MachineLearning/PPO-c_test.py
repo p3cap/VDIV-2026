@@ -1,9 +1,9 @@
 """
 PPO-based ML training for a Mars Rover environment.
-Observation (17 inputs):
-  battery, gear, run_hrs, time_of_day, rover_x, rover_y,
+Observation (inputs):
+  battery, gear, run_hrs, time_left, time_of_day, rover_x, rover_y,
   prev_mined_x, prev_mined_y,
-  [dist, x, y] × MINERAL_COUNT closest minerals (default: 3)
+  [dist, x, y] × MINERAL_COUNT closest minerals
 Action (continuous Box, 3 outputs):
   [0] gear   → snapped to {SLOW=0, NORMAL=0.5, FAST=1}
   [1] goto_x → normalised 0-1
@@ -14,6 +14,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Sequence
 
 MARS_ROVER_ROOT = Path(__file__).parent.parent
 sys.path.append(str(MARS_ROVER_ROOT))
@@ -97,21 +98,43 @@ class RoverEnv(gym.Env):
     NO_MOVE_PENALTY_BASE   = 6.0
     NO_MOVE_PENALTY_STREAK = 2.0
     NO_MOVE_PENALTY_CAP    = 30.0
+    RETURN_HOME_BONUS_MAX  = 500.0
+    RETURN_HOME_WINDOW     = 0.2
+    RETURN_HOME_MIN_MINED  = 1
     MINERAL_COUNT          = DEFAULT_MINERAL_COUNT
 
-    # obs: [battery, gear, run_hrs, tod, rx, ry, pmx, pmy] + MINERAL_COUNT×[dist,x,y]
+    # obs: [battery, gear, run_hrs, time_left, tod, rx, ry, pmx, pmy] + MINERAL_COUNT×[dist,x,y]
     OBS_SIZE = obs_size(MINERAL_COUNT)
 
-    def __init__(self, run_hrs: float = 24.0, delta_hrs: float = 0.5):
+    def __init__(
+        self,
+        run_hrs: float = 24.0,
+        delta_hrs: float = 0.5,
+        run_hrs_options: Sequence[float] | None = None,
+        delta_mode: str = "set_time",
+        tick_seconds: float = 0.0,
+        env_speed: float = 1.0,
+        map_csv_path: str | None = None,
+    ):
         super().__init__()
         self.mineral_count = self.MINERAL_COUNT
-        self.run_hrs   = run_hrs
-        self.delta_hrs = delta_hrs
+        self.run_hrs   = max(24.0, float(run_hrs))
+        self.delta_hrs = float(delta_hrs)
+        self.delta_mode = str(delta_mode)
+        self.tick_seconds = float(tick_seconds)
+        self.env_speed = float(env_speed)
+        self.map_csv_path = map_csv_path
+        if run_hrs_options:
+            cleaned = [max(24.0, float(v)) for v in run_hrs_options]
+            self.run_hrs_options = [v for v in cleaned if v >= 24.0]
+        else:
+            self.run_hrs_options = []
 
         self.world = RoverSimulationWorld(
-            run_hrs=run_hrs, delta_mode="set_time",
-            set_delta_hrs=delta_hrs, tick_seconds=0.0,
-            env_speed=1.0, web_logger=False,
+            run_hrs=self.run_hrs, delta_mode=self.delta_mode,
+            set_delta_hrs=self.delta_hrs, tick_seconds=self.tick_seconds,
+            env_speed=self.env_speed, web_logger=False,
+            map_csv_path=self.map_csv_path,
         )
         self.map_w = self.world.map_width
         self.map_h = self.world.map_height
@@ -124,9 +147,12 @@ class RoverEnv(gym.Env):
         self._obs_buf        = np.zeros(self.OBS_SIZE, dtype=np.float32)
         self._cycle_hrs      = self.world.sim.day_hrs + self.world.sim.night_hrs
         self._prev_mined     = Vector2(0, 0)
+        self._start_pos      = Vector2(0, 0)
         self._no_move_streak = 0
         self._mining_streak  = 0
+        self._no_mine_streak = 0
         self._total_mined    = 0
+        self._last_delta_hrs = self.delta_hrs
         # mineral cache: list of (Vector2, manhattan_dist)
         self._mineral_cache: list[tuple] = []
         self._minerals_dirty = True
@@ -153,28 +179,53 @@ class RoverEnv(gym.Env):
 
     def _reward(self, mined_now: int, dist_gain: float,
                 battery_cost: float, minerals_left: int, is_dead: bool) -> float:
-        reward, self._no_move_streak, self._mining_streak = compute_reward(
+        is_mining = self.world.rover.status == STATUS.MINE
+        reward, self._no_move_streak, self._mining_streak, self._no_mine_streak = compute_reward(
             mined_now=mined_now,
             dist_gain=dist_gain,
             battery_cost=battery_cost,
             minerals_left=minerals_left,
             is_dead=is_dead,
+            is_mining=is_mining,
             no_move_streak=self._no_move_streak,
             mining_streak=self._mining_streak,
+            no_mine_streak=self._no_mine_streak,
             penalty_base=self.NO_MOVE_PENALTY_BASE,
             penalty_streak=self.NO_MOVE_PENALTY_STREAK,
             penalty_cap=self.NO_MOVE_PENALTY_CAP,
         )
+        sim = self.world.sim
+        run_hrs = max(1e-6, float(sim.run_hrs))
+        time_left_frac = max(0.0, (run_hrs - float(sim.elapsed_hrs)) / run_hrs)
+        if (not is_dead) and self._total_mined >= self.RETURN_HOME_MIN_MINED:
+            bonus = self._return_home_bonus(self.world.rover.pos)
+            if sim.is_running and time_left_frac <= self.RETURN_HOME_WINDOW:
+                window_hrs = max(1e-6, self.RETURN_HOME_WINDOW * run_hrs)
+                step_scale = min(1.0, max(0.0, self._last_delta_hrs / window_hrs))
+                reward += bonus * step_scale
+            elif not sim.is_running:
+                reward += bonus
         return reward
+
+    def _return_home_bonus(self, rover_pos: Vector2) -> float:
+        max_dist = max(1.0, float((self.map_w - 1) + (self.map_h - 1)))
+        dist = abs(rover_pos.x - self._start_pos.x) + abs(rover_pos.y - self._start_pos.y)
+        closeness = max(0.0, 1.0 - (dist / max_dist))
+        return self.RETURN_HOME_BONUS_MAX * closeness
 
     # ── gym API ───────────────────────────────────────────────────
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
+        if self.run_hrs_options:
+            self.run_hrs = float(np.random.choice(self.run_hrs_options))
+            self.world.run_hrs = self.run_hrs
         self.world.reset()
         self._prev_mined     = Vector2(0, 0)
+        self._start_pos      = Vector2(self.world.rover.pos.x, self.world.rover.pos.y)
         self._no_move_streak = 0
         self._mining_streak  = 0
+        self._no_mine_streak = 0
         self._total_mined    = 0
         self._cycle_hrs      = self.world.sim.day_hrs + self.world.sim.night_hrs
         self._minerals_dirty = True
@@ -205,7 +256,8 @@ class RoverEnv(gym.Env):
         prev_dist    = rover.distance_travelled
         prev_mined   = self._total_mined
 
-        self.world.step(sleep=False)
+        delta_hrs, _ = self.world.step(sleep=False)
+        self._last_delta_hrs = delta_hrs
 
         self._total_mined = len(rover.mined)
         mined_now = self._total_mined - prev_mined
@@ -256,13 +308,41 @@ def parallelism(device: str, cpu_limit: float, n_envs: int, torch_threads: int):
     if torch_threads <= 0: torch_threads = 1 if device == "cuda" else max(1, budget - n_envs)
     return budget, min(max(1, n_envs), budget), min(max(1, torch_threads), budget)
 
-def build_vec_env(n_envs: int):
-    make = lambda: RoverEnv()
+def build_vec_env(
+    n_envs: int,
+    run_hrs_options: Sequence[float] | None = None,
+    delta_mode: str = "set_time",
+    set_delta_hrs: float = 0.5,
+    tick_seconds: float = 0.0,
+    env_speed: float = 1.0,
+    map_csv_path: str | None = None,
+):
+    make = lambda: RoverEnv(
+        run_hrs=run_hrs_options[0] if run_hrs_options else 24.0,
+        delta_hrs=set_delta_hrs,
+        run_hrs_options=run_hrs_options,
+        delta_mode=delta_mode,
+        tick_seconds=tick_seconds,
+        env_speed=env_speed,
+        map_csv_path=map_csv_path,
+    )
     return SubprocVecEnv([make] * n_envs) if n_envs > 1 else DummyVecEnv([make])
 
 
-def train_model(timesteps: int, out_path: str, device: str = "auto",
-                cpu_limit: float = 1.0, n_envs: int = 0, torch_threads: int = 0):
+def train_model(
+    timesteps: int,
+    out_path: str,
+    device: str = "auto",
+    cpu_limit: float = 1.0,
+    n_envs: int = 0,
+    torch_threads: int = 0,
+    run_hrs_options: Sequence[float] | None = (24.0, 36.0, 48.0, 72.0),
+    delta_mode: str = "set_time",
+    set_delta_hrs: float = 0.5,
+    tick_seconds: float = 0.0,
+    env_speed: float = 1.0,
+    map_csv_path: str | None = None,
+):
     t0  = time.perf_counter()
     dev = resolve_device(device)
     _, n_envs, torch_threads = parallelism(dev, cpu_limit, n_envs, torch_threads)
@@ -276,7 +356,27 @@ def train_model(timesteps: int, out_path: str, device: str = "auto",
     print(f"[PPO] device={dev}  envs={n_envs}  threads={torch_threads}"
           f"  n_steps={n_steps}  batch={batch_size}  target={timesteps:,}", flush=True)
 
-    vec_env   = build_vec_env(n_envs)
+    run_hrs_options = list(run_hrs_options or [])
+    if run_hrs_options:
+        run_hrs_options = [max(24.0, float(v)) for v in run_hrs_options]
+    vec_env   = build_vec_env(
+        n_envs,
+        run_hrs_options=run_hrs_options,
+        delta_mode=delta_mode,
+        set_delta_hrs=set_delta_hrs,
+        tick_seconds=tick_seconds,
+        env_speed=env_speed,
+        map_csv_path=map_csv_path,
+    )
+    env_info = RoverEnv(
+        run_hrs=run_hrs_options[0] if run_hrs_options else 24.0,
+        delta_hrs=set_delta_hrs,
+        run_hrs_options=run_hrs_options,
+        delta_mode=delta_mode,
+        tick_seconds=tick_seconds,
+        env_speed=env_speed,
+        map_csv_path=map_csv_path,
+    )
     base_path = Path(out_path).with_suffix("")
     model_zip = base_path.with_suffix(".zip")
 
@@ -301,15 +401,50 @@ def train_model(timesteps: int, out_path: str, device: str = "auto",
 
     model.save(str(base_path))
     settings_path = base_path.with_suffix(".txt")
-    settings_path.write_text(
-        "\n".join([
-            f"mineral_count={RoverEnv.MINERAL_COUNT}",
-            f"use_mineral_distance={USE_MINERAL_DISTANCE}",
-            f"per_mineral_fields={PER_MINERAL_FIELDS}",
-            f"obs_size={obs_size(RoverEnv.MINERAL_COUNT)}",
-        ]),
-        encoding="utf-8",
-    )
+    settings_lines = [
+        "# Environment",
+        f"run_hrs_options={run_hrs_options}",
+        f"run_hrs_min=24.0",
+        f"delta_mode={delta_mode}",
+        f"set_delta_hrs={set_delta_hrs}",
+        f"tick_seconds={tick_seconds}",
+        f"env_speed={env_speed}",
+        f"map_csv_path={map_csv_path}",
+        f"resolved_map_path={env_info.world.map_path}",
+        f"map_width={env_info.world.map_width}",
+        f"map_height={env_info.world.map_height}",
+        f"day_hrs={env_info.world.sim.day_hrs}",
+        f"night_hrs={env_info.world.sim.night_hrs}",
+        f"mineral_count={RoverEnv.MINERAL_COUNT}",
+        f"use_mineral_distance={USE_MINERAL_DISTANCE}",
+        f"per_mineral_fields={PER_MINERAL_FIELDS}",
+        f"obs_size={obs_size(RoverEnv.MINERAL_COUNT)}",
+        f"no_move_penalty_base={RoverEnv.NO_MOVE_PENALTY_BASE}",
+        f"no_move_penalty_streak={RoverEnv.NO_MOVE_PENALTY_STREAK}",
+        f"no_move_penalty_cap={RoverEnv.NO_MOVE_PENALTY_CAP}",
+        f"return_home_bonus_max={RoverEnv.RETURN_HOME_BONUS_MAX}",
+        "",
+        "# PPO",
+        f"timesteps_target={timesteps}",
+        f"device={dev}",
+        f"n_envs={n_envs}",
+        f"torch_threads={torch_threads}",
+        f"n_steps={n_steps}",
+        f"batch_size={batch_size}",
+        f"n_epochs={model.n_epochs}",
+        f"gamma={model.gamma}",
+        f"gae_lambda={model.gae_lambda}",
+        f"clip_range={model.clip_range}",
+        f"ent_coef={model.ent_coef}",
+        f"vf_coef={model.vf_coef}",
+        f"learning_rate={model.learning_rate}",
+        f"policy={model.policy.__class__.__name__}",
+    ]
+    settings_path.write_text("\n".join(settings_lines), encoding="utf-8")
+    try:
+        env_info.world.close()
+    except Exception:
+        pass
     (base_path.parent / "latest_ppo_model.txt").write_text(base_path.name, encoding="utf-8")
     vec_env.close()
     print(f"[PPO] Finished in {time.perf_counter()-t0:.1f}s  →  {base_path}.zip", flush=True)

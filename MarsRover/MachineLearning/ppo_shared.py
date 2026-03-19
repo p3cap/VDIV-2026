@@ -21,7 +21,8 @@ from Global import Vector2
 from RoverClass import GEARS
 
 # Observation layout constants
-OBS_STATIC_FIELDS = 8  # battery, gear, run_hrs, tod, rx, ry, prev_mined x/y
+# battery, gear, run_hrs_norm, time_left, tod, rx, ry, prev_mined x/y
+OBS_STATIC_FIELDS = 9
 DEFAULT_MINERAL_COUNT = 10
 # Toggle inclusion of distance per mineral (Manhattan placeholder for A*)
 USE_MINERAL_DISTANCE = True
@@ -76,14 +77,17 @@ def build_obs(
 
     obs[0] = rover.battery / rover.MAX_BATTERY_CHARGE
     obs[1] = GEAR_TO_FLOAT[rover.gear]
-    obs[2] = min(1.0, world.run_hrs / 240.0)
-    obs[3] = (sim.elapsed_hrs % cycle) / cycle if cycle else 0.0
-    obs[4] = rover.pos.x * inv_w
-    obs[5] = rover.pos.y * inv_h
+    run_hrs = max(1e-6, float(sim.run_hrs))
+    obs[2] = min(1.0, run_hrs / 240.0)
+    time_left = max(0.0, run_hrs - float(sim.elapsed_hrs))
+    obs[3] = min(1.0, time_left / run_hrs)
+    obs[4] = (sim.elapsed_hrs % cycle) / cycle if cycle else 0.0
+    obs[5] = rover.pos.x * inv_w
+    obs[6] = rover.pos.y * inv_h
     px = prev_mined.x if prev_mined is not None else 0
     py = prev_mined.y if prev_mined is not None else 0
-    obs[6] = px * inv_w
-    obs[7] = py * inv_h
+    obs[7] = px * inv_w
+    obs[8] = py * inv_h
 
     cache = mineral_cache or []
     max_d = float(world.map_width + world.map_height)
@@ -106,37 +110,43 @@ def compute_reward(
     dist_gain: float,
     battery_cost: float,
     minerals_left: int,
-    is_dead: bool,
-    no_move_streak: int,
-    mining_streak: int,
+    is_dead: bool = False,
+    is_mining: bool = False,
+    no_move_streak: int = 0,
+    mining_streak: int = 0,
+    no_mine_streak: int = 0,
     penalty_base: float = 6.0,
     penalty_streak: float = 2.0,
     penalty_cap: float = 30.0,
-) -> tuple[float, int, int]:
+) -> tuple[float, int, int, int]:
     """Shared reward shaping with streak bookkeeping.
 
     Goals:
     - Strongly reward mining, with a bonus for consecutive mining (streak).
-    - Penalize idling (no move + no mine) heavily.
+    - Penalize idling (no move + no mine) heavily; do not punish active mining ticks.
+    - Penalize long gaps without mining even if moving, to keep pressure on ore collection.
     - Small time penalty to push faster collection.
     """
-    reward = -0.1  # time pressure for faster mining
+    reward = -0.05  # mild time pressure for faster mining
 
     # Mining reward with streak bonus
     if mined_now > 0:
         mining_streak += 1
-        streak_bonus = min(24.0, 4.0 * mining_streak)
-        reward += mined_now * (22.0 + streak_bonus)
+        no_mine_streak = 0
+        streak_bonus = min(36.0, 6.0 * mining_streak)
+        reward += mined_now * (32.0 + streak_bonus)
     else:
         mining_streak = 0
-        reward -= 1.2  # no mining this step (keeps pressure to find minerals)
+        if not is_mining:
+            no_mine_streak += 1
+            reward -= min(12.0, 1.5 * no_mine_streak)
 
     # Movement/battery shaping (fast but not reckless)
     reward += dist_gain * 0.15
     reward -= battery_cost * 0.03
 
     # Large idle penalty when neither moving nor mining
-    if dist_gain <= 0 and mined_now <= 0:
+    if dist_gain <= 0 and mined_now <= 0 and not is_mining:
         no_move_streak += 1
         reward -= min(penalty_cap, penalty_base + penalty_streak * no_move_streak)
     else:
@@ -147,4 +157,4 @@ def compute_reward(
     if minerals_left == 0:
         reward += 80.0
 
-    return float(reward), no_move_streak, mining_streak
+    return float(reward), no_move_streak, mining_streak, no_mine_streak
