@@ -282,7 +282,8 @@
 
 .wmodal {
   width: 100%;
-  max-width: 780px;
+  max-width: 680px;
+  max-height: 90dvh;
   background: linear-gradient(145deg, rgba(15, 26, 46, 0.99), rgba(7, 12, 24, 1));
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-top: 2px solid var(--modal-accent, var(--accent));
@@ -295,6 +296,7 @@
   flex-direction: column;
   overflow: hidden;
   transform: translateY(28px) scale(0.97);
+  margin-left: var(--sidebar-w);
 }
 
 /* Modal header */
@@ -669,11 +671,14 @@
    ──────────────────────────────── */
 @media (max-width: 576px) {
   .welcome{ width: 100vw; margin-left: 0; margin-top: var(--navbar-h);}
-  .wmodal {  border-radius: var(--r-md); margin-left: var(--sidebar-w); margin-top: calc(var(--navbar-h) * 3); }
+  .wmodal {  border-radius: var(--r-md); margin-left: 0; margin-top: calc(var(--navbar-h) ); }
   .wmodal__body { padding: var(--sp-4); }
   .wmodal__head { padding: var(--sp-4); }
   .wmodal__foot { padding: var(--sp-3) var(--sp-4); }
   .wmodal__members { grid-template-columns: 1fr; }
+  .wmodal__stat-value {
+    font-size: 0.9rem;
+  }
 }
 
 @media (max-width: 380px) {
