@@ -72,10 +72,10 @@ class MinuteProgressCallback(BaseCallback):
         elapsed   = max(1e-9, time.perf_counter() - self._t0)
         done      = max(0, int(self.model.num_timesteps) - self._steps_start)
         pct       = min(100.0, done / self.total_timesteps * 100.0)
-        fps       = done / elapsed
+        fps       = done / elapsed /3600
         remaining = (self.total_timesteps - done) / max(1.0, fps) /3600
         print(f"[PPO] {done:>10,}/{self.total_timesteps:,}  ({pct:5.1f}%)"
-              f"  elapsed={elapsed:7.1f}s  fps={fps:7.1f}  eta={remaining:7.1f}hrs", flush=True)
+              f"  elapsed={elapsed:7.1f}hrs  fps={fps:7.1f}  eta={remaining:7.1f}hrs", flush=True)
 
     def _on_step(self) -> bool:
         # cheap gate: only hit perf_counter every check_every_steps
