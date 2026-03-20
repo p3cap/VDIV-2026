@@ -1,8 +1,17 @@
 # Server Documentation
 
 ## Concept
-The server is a small FastAPI backend that sits between the rover side and the dashboard. 
-It stores the latest setup data and latest live rover data, exposes them over HTTP, and also pushes updates over WebSocket.
+The server is a small FastAPI backend that sits between the rover side and the dashboard. It stores the latest setup data and latest live rover data, exposes them over HTTP, and also pushes updates over WebSocket.
+
+## Files By Category
+
+### Backend file
+- `Server/Server.py`
+ - FastAPI app, HTTP routes, WebSocket route, and in-memory live/setup storage.
+
+### Rover-side related file
+- `MarsRover/RoverLogger.py`
+ - Client-side sender used by the rover processes to publish data to the backend.
 
 ## Main Components
 
@@ -78,3 +87,11 @@ Simple connection list manager for active WebSocket clients.
 
 - `ws_endpoint(ws)`
  - Main websocket route handler for snapshots, pings, and pushed updates.
+
+## Usage
+
+- Start the backend by running `Server/Server.py`.
+- Rover-side scripts can send setup/live data through `RoverLogger`.
+- Dashboard clients can:
+ - poll `GET /get_setup` and `GET /get_data`
+ - or connect to `WS /ws` for live pushed updates

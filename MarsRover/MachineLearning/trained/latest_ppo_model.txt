@@ -1,1 +1,1 @@
-bmai-10M
+bmai-100M

@@ -47,5 +47,5 @@ illetve a dashboard/src/doc/hu mappában
 
 Megjegyzés: 
   A machine learning ppo model képzése, optimális erőforrásokkal, idővel és a megfelelő környezetben képes a legoptimálisabb taktikát megtalálni
-  Mivel erre nem volt lehetőségünk, ezért kidolgoztunk egy megbízhatóbb algoritmust a bányászásra, ezt indításkor a brain opcióval lehet futtatni.
+  Mivel erre nem volt lehetőségünk, ezért kidolgoztunk egy alternatív(nem ml) algoritmust a bányászásra, ezt indításkor a brain opcióval lehet futtatni.
   A PPO_machine_learning_doc.md dokumentáció tartalmazza a machine learning működését.

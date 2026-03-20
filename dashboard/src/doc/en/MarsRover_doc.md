@@ -1,9 +1,46 @@
 # Mars Rover Documentation
 
 ## Concept
-The Mars rover module is a small Python simulation package. It contains the rover logic, the map, the time/day-night simulation, and a world wrapper that can step the whole system and optionally send live data to the dashboard/server.
+The Mars rover module is a Python simulation package. It contains the rover logic, the map, the simulation clock, simple runner scripts, server logging support, and a heuristic controller.
+
+## Files By Category
+
+### Core simulation files
+- `Global.py`
+ - Shared small global objects such as `Vector2` and the rover root path.
+- `MapClass.py`
+ - Grid map storage and tile access.
+- `Simulation.py`
+ - Simulation time, total runtime, and day/night cycle handling.
+- `RoverClass.py`
+ - Main rover logic: movement, mining, battery, pathfinding, and payload generation.
+- `Simulation_env.py`
+ - High-level wrapper that creates and steps the whole rover world.
+
+### Runtime / control files
+- `main.py`
+ - Simple basic runner for the rover simulation.
+- `brain.py`
+ - Heuristic non-ML rover controller that chooses targets and sends live data.
+
+### Integration files
+- `RoverLogger.py`
+ - Sends rover setup/live packets to the backend through WebSocket or HTTP.
+- `_cpp_path_loader.py`
+ - Tries to load the optional C++ pathfinding module.
 
 ## Main Components
+
+### class Vector2
+Small shared coordinate object used across the rover code.
+
+- variables:
+ - `x`: x coordinate `[int]`
+ - `y`: y coordinate `[int]`
+
+- functions:
+ - `_dict(self)`
+  - Converts the coordinate to `{x, y}` dictionary format.
 
 ### class Rover
 Main controllable rover object.
@@ -112,7 +149,7 @@ High-level wrapper that creates and steps the whole rover world.
 
 - constructor arguments:
  - `run_hrs`: total simulation runtime `[float]`
- - `delta_mode`: time stepping mode, for example fixed or real-time `[str]`
+ - `delta_mode`: time stepping mode `[str]`
  - `set_delta_hrs`: fixed simulation step size in hours `[float]`
  - `tick_seconds`: optional real sleep time between steps `[float]`
  - `env_speed`: speed multiplier for real-time stepping `[float]`
@@ -137,3 +174,65 @@ High-level wrapper that creates and steps the whole rover world.
   - Returns all mineral positions currently on the map.
  - `close(self)`
   - Closes the logger connection if logging is enabled.
+
+### class RoverLogger
+Small backend communication helper.
+
+- constructor arguments:
+ - `base_url`: backend base URL `[str]`
+ - `ws_path`: websocket route `[str]`
+ - `timeout`: request/socket timeout `[float]`
+
+- important variables:
+ - `base_url`: normalized backend base url `[str]`
+ - `ws_url`: websocket url `[str]`
+
+- functions:
+ - `send_setup(self, data: dict)`
+  - Sends setup payload to the backend.
+ - `send_live(self, data: dict)`
+  - Sends live rover payload to the backend.
+ - `close(self)`
+  - Closes the active websocket if one is open.
+
+## Runner Files
+
+### `main.py`
+Simple example runner for the rover simulation.
+
+- main functions:
+ - `parse_args()`
+  - Reads CLI options for map, runtime, speed, and stepping mode.
+ - `main()`
+  - Creates a simulation world, moves the rover toward random targets, and prints the live state.
+
+### `brain.py`
+Heuristic rover controller without machine learning.
+
+- role:
+ - Builds a rover world.
+ - Chooses mineral targets with hand-written rules.
+ - Adjusts speed by simple heuristics.
+ - Sends setup/live rover data to the backend.
+
+- main functions:
+ - `parse_args()`
+  - Reads CLI options for runtime, backend, timing, and map.
+ - `init_world(args)`
+  - Initializes the rover world and optional backend logger.
+ - `send_setup()`
+  - Sends the map/setup payload to the backend.
+ - `send_live_data(current_target=None, planned_path=None)`
+  - Sends current rover telemetry to the backend.
+ - `main()`
+  - Runs the heuristic mining loop until the rover stops or no safe target remains.
+
+## Integration Notes
+
+### `_cpp_path_loader.py`
+Optional pathfinding backend loader.
+
+- role:
+ - Adds the `cpp_pathfind` folder to the Python path.
+ - Tries to import the `cpp_path` extension.
+ - Exposes whether C++ pathfinding is available.
