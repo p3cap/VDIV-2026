@@ -46,13 +46,13 @@
 					<div class="stat-item">
 						<span class="stat-lbl">SPEED</span>
 						<span class="stat-val"
-							>{{ dashboard?.rover_speed ?? '—' }}<em>m/s</em></span
+							>{{ dashboard?.rover_speed ?? '—' }}<em>cells/h</em></span
 						>
 					</div>
 					<div class="stat-item">
 						<span class="stat-lbl">DISTANCE</span>
 						<span class="stat-val"
-							>{{ dashboard?.rover_distance_travelled ?? '—' }}<em>m</em></span
+							>{{ dashboard?.rover_distance_travelled ?? '—' }}<em>cells</em></span
 						>
 					</div>
 				</div>
@@ -151,7 +151,7 @@
 					<span class="card-title">DISTANCE OVER TIME</span>
 					<div class="legend-row">
 						<span class="leg-dot" style="background: #00ffc8" /><span
-							>Distance (m)</span
+							>Distance (cells)</span
 						>
 					</div>
 				</div>
@@ -302,7 +302,7 @@ function initDist() {
 			fill: 'rgba(0,255,200,0.06)',
 		},
 	]
-	const opts = makePlotOpts(distRef.value, series, 'm')
+	const opts = makePlotOpts(distRef.value, series, 'cells')
 	const data = [Float64Array.from(hTime), Float64Array.from(hDist)]
 	uDist = new uPlot(opts, data, distRef.value)
 }
@@ -325,7 +325,7 @@ function initEnergy() {
 			fill: 'rgba(255,107,53,0.06)',
 		},
 	]
-	const opts = makePlotOpts(energyRef.value, series, 'kW')
+	const opts = makePlotOpts(energyRef.value, series, 'per hr')
 	const data = [Float64Array.from(hTick), Float64Array.from(hProd), Float64Array.from(hCons)]
 	uEnergy = new uPlot(opts, data, energyRef.value)
 }

@@ -18,16 +18,3 @@ def load_map(csv_path):
         "grid": grid
     }
 
-
-
-
-#teszteleshez, majd kesobb fastapi
-def main():
-    data = load_map(in_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    print("Converted to JSON")
-
-if __name__ == "__main__":
-    main()
