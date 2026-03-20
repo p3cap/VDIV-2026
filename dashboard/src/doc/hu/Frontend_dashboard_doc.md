@@ -10,11 +10,10 @@ A vizualizáció Vite + Vue 3 alapú, amely valós idejű adatokat jelenít meg 
 
 ## Oldalak (Views)
 - `WelcomePage.vue`: üdvözlő/landing oldal kártyákkal és modalokkal.
-- `Map2dPage.vue`: 2D térkép PixiJS-sel. A map + rover pozíció + útvonal a store-ból.
-- `DashboardPage.vue`: statisztikák, grafikonok. uPlot chartok + saját SVG/Canvas elemek.
-- `Map3dPage.vue`: 3D térkép Three.js-szel, HUD és műszerek overlayként.
-- `DocumentationPage.vue`: beépített dokumentációs nézet (markdown betöltés `dashboard/src/doc/{hu,en}` alól).
-- `SettingsComponent.vue`: beállítások (jelenleg placeholder).
+- `Map2dPage.vue`: 2D térkép PixiJS-sel. A map + rover pozíció + útvonal a store-ból, texture-pack váltóval (default/pixelart/minecraft), éjszakai overlay-jel és HUD panelek kapcsolásával.
+- `DashboardPage.vue`: statisztikák, grafikonok. uPlot chartok + saját SVG/Canvas elemek (battery ív, cargo pie, mined scatter), LIVE/OFFLINE jelzés `isConnected` alapján.
+- `Map3dPage.vue`: 3D térkép Three.js-szel, HUD és műszerek overlayként, részletes vezérléssel (egér/keyboard/touch), nappal–éj ciklussal, státusz‑fénnyel és path‑tube útvonallal.
+- `DocumentationPage.vue`: beépített dokumentációs nézet (markdown betöltés `dashboard/src/doc/{hu,en}` alól), külön HU/EN váltóval és dinamikus docs-navigációval.
 
 ## Adatfolyam és state
 - `stores/liveWs.js`
@@ -29,10 +28,9 @@ A vizualizáció Vite + Vue 3 alapú, amely valós idejű adatokat jelenít meg 
 - `RoverInstruments.vue`: műszerek (sebesség, állapot, akku).
 - `NavComponent.vue`: animejs animált, ikonos sidebar.
 - `NavPhoneComponent.vue`: mobil navigáció.
-- `RoverStatsComponent.vue`: placeholder.
-- `SettingsComponent.vue`: placeholder.
+- `SettingsComponent.vue`: bővithető nyelvváltó popup (nem külön oldal, a sidebarból nyílik).
 
-## Használt libraryk (a kódban ténylegesen)
+## Használt libraryk
 - `vue` – UI framework, komponensek és reaktív state.
 - `vue-router` – oldal-navigáció és route alapú oldalak.
 - `pinia` – globális state management (`liveWs` store).
@@ -44,20 +42,18 @@ A vizualizáció Vite + Vue 3 alapú, amely valós idejű adatokat jelenít meg 
 - `lucide-vue-next` – ikonok a navigációhoz.
 - `marked` – markdown -> HTML konverzió a dokumentációs nézethez.
 - `github-markdown-css` – markdown stílusok a dokumentációs nézethez.
+- `echarts` – telepítve, de jelenleg nincs aktív használat (legacy / későbbi chartok).
+- `@tresjs/core`, `@tresjs/cientos` – telepítve, de jelenleg nincs aktív használat (Three.js wrapper).
 
-## Telepített, de jelenleg nem használt
-- `echarts` – nincs aktív használat a frontenden (korábbi / tervezett chartokhoz).
-- `@tresjs/core`, `@tresjs/cientos` – nincs aktív használat (Three.js alternatív wrapper).
+
 
 ## Telepítés és futtatás
 
-### macOS / linux:
-- Függőségek telepítése: `python3 setup/setup_deps.py`
-- Szerver futtatása: `python3 setup/run_dev.py`
+### Függőségek telepítése
+`python setup/setup_deps.py`
+### Szerver futtatása
+`python setup/run_dev.py`
 
-### Windows:
-- Függőségek telepítése: `python setup/setup_deps.py`
-- Szerver futtatása: `python setup/run_dev_win.py`
 
 ### Node verzió
 - Ajánlott: `node` `^20.19.0` vagy `>=22.12.0`

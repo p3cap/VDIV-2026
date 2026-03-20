@@ -23,7 +23,7 @@ import blue from '@/assets/minecraft/blue.png'
 import green from '@/assets/minecraft/green.png'
 import yellow from '@/assets/minecraft/yellow.png'
 import roverImg from '@/assets/rover.png'
-import start from '@/assets/rover.png'
+import start from '@/assets/minecraft/start.png'
 
 const textureFiles = import.meta.glob('@/assets/**/*.png', { eager: true, as: 'url' })
 const textureIndex = Object.entries(textureFiles).reduce((acc, [path, url]) => {

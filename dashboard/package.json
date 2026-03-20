@@ -13,7 +13,6 @@
     "@tresjs/cientos": "^5.5.0",
     "@tresjs/core": "^5.6.0",
     "animejs": "^4.3.6",
-    "echarts": "^6.0.0",
     "github-markdown-css": "^5.9.0",
     "lucide-vue-next": "^0.575.0",
     "marked": "^17.0.4",

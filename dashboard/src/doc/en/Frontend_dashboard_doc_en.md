@@ -10,11 +10,10 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 
 ## Pages (Views)
 - `WelcomePage.vue`: landing page with cards and modals.
-- `Map2dPage.vue`: 2D map using PixiJS. The map, rover position, and path come from the store.
-- `DashboardPage.vue`: statistics and charts. uPlot charts + custom SVG/Canvas elements.
-- `Map3dPage.vue`: 3D map using Three.js with HUD and instrument overlays.
-- `DocumentationPage.vue`: in-app docs view (markdown loaded from `dashboard/src/doc/{hu,en}`).
-- `SettingsComponent.vue`: settings (currently a placeholder).
+- `Map2dPage.vue`: 2D map using PixiJS. The map, rover position, and path come from the store, with a texture-pack switcher (default/pixelart/minecraft), night overlay, and HUD panel toggles.
+- `DashboardPage.vue`: statistics and charts. uPlot charts + custom SVG/Canvas elements (battery arc, cargo pie, mined scatter), LIVE/OFFLINE badge via `isConnected`.
+- `Map3dPage.vue`: 3D map using Three.js with HUD and instrument overlays, detailed controls (mouse/keyboard/touch), day–night cycle, status light, and path tube.
+- `DocumentationPage.vue`: in-app docs view (markdown loaded from `dashboard/src/doc/{hu,en}`), with separate HU/EN switch and dynamic docs navigation.
 
 ## Data Flow and State
 - `stores/liveWs.js`
@@ -29,10 +28,9 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 - `RoverInstruments.vue`: instruments (speed, status, battery).
 - `NavComponent.vue`: animejs-animated icon sidebar.
 - `NavPhoneComponent.vue`: mobile navigation.
-- `RoverStatsComponent.vue`: placeholder.
-- `SettingsComponent.vue`: placeholder.
+- `SettingsComponent.vue`: language selection popup (not a separate view, opened from the sidebar).
 
-## Libraries Used (actually used in the code)
+## Libraries Used
 - `vue` – UI framework, components and reactive state.
 - `vue-router` – page navigation and route-based views.
 - `pinia` – global state management (`liveWs` store).
@@ -44,20 +42,18 @@ The visualization is built with Vite + Vue 3 and displays real-time data via a F
 - `lucide-vue-next` – icon set for navigation.
 - `marked` – markdown -> HTML conversion for the docs view.
 - `github-markdown-css` – markdown styling for the docs view.
+- `echarts` – installed but not currently used (legacy / planned charts).
+- `@tresjs/core`, `@tresjs/cientos` – installed but not currently used (Three.js wrapper).
 
-## Installed but currently unused
-- `echarts` – no active usage in the frontend (legacy / planned charts).
-- `@tresjs/core`, `@tresjs/cientos` – no active usage (Three.js wrapper).
+
 
 ## Installation and Running
 
-### macOS / Linux
-- Install dependencies: `python3 setup/setup_deps.py`
-- Run the server: `python3 setup/run_dev.py`
+### Install dependencies
+`python setup/setup_deps.py`
 
-### Windows
-- Install dependencies: `python setup/setup_deps.py`
-- Run the server: `python setup/run_dev_win.py`
+### Run the server
+`python setup/run_dev.py`
 
 ### Node version
 - Recommended: `node` `^20.19.0` or `>=22.12.0`
