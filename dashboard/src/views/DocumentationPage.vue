@@ -43,7 +43,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { marked } from 'marked'
-import { Info, BookOpen, Settings, Code, MonitorCloud } from 'lucide-vue-next'
+import { HardDrive, Car, BrainCircuit, MonitorCloud } from 'lucide-vue-next'
 
 // Állapot
 const currentLang = ref('hu')           // alapértelmezett nyelv
@@ -51,7 +51,7 @@ const currentMarkdown = ref('')
 const currentPath = ref('')
 
 // Ikonok
-const icons = [MonitorCloud, Info, BookOpen, Settings, Code]
+const icons = [MonitorCloud, Car, BrainCircuit, HardDrive]
 
 // Segédfüggvény: tooltip formázás
 const formatName = (raw) => {
