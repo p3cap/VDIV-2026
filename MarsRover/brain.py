@@ -37,7 +37,7 @@ delta_hrs = 0.5
 tick_seconds = 1
 env_speed = 1.0
 send_every = 1
-run_hrs = 240.0
+run_hrs = 24.0
 
 USE_SERVER = True
 
@@ -91,20 +91,11 @@ NIGHT_RESERVE = 15.0
 RETURN_MARGIN = 1.10
 
 # ---------------------------------------------------------
-# Ha ennyi tick van már csak hátra, befejezzük a kitermelést és hazamegyünk
-# ---------------------------------------------------------
-END_TICKS = 30
-
-# ---------------------------------------------------------
-# Klaszter paraméterek
+# Klaszter / cleanup
 # ---------------------------------------------------------
 CLUSTER_RADIUS = 10
 DENSE_CLUSTER_BONUS = 18
 CLUSTER_STICKINESS = 40
-
-# ---------------------------------------------------------
-# Helyi takarítás sugár
-# ---------------------------------------------------------
 LOCAL_CLEANUP_RADIUS = 2
 
 # ---------------------------------------------------------
@@ -128,7 +119,6 @@ def _normalize_base_url(raw: str, fallback: str) -> str:
         parsed = urlparse(raw)
 
     scheme = parsed.scheme.lower()
-
     if scheme == "ws":
         scheme = "http"
     elif scheme == "wss":
@@ -179,11 +169,6 @@ def parse_args():
 
 
 def find_base_pos():
-    """
-    A bázis pozícióját a térképen lévő 'S' mezőből keressük ki.
-    Ha valamiért nincs S, fallbackként a rover aktuális pozíciója,
-    végső esetben (0,0).
-    """
     if map_obj is not None and hasattr(map_obj, "map_data"):
         for y, row in enumerate(map_obj.map_data):
             for x, tile in enumerate(row):
@@ -233,7 +218,6 @@ def init_world(args):
 
     logger = RoverLogger(BASE_URL) if USE_SERVER else None
 
-
 # =========================================================
 # GEAR SEGÉD
 # =========================================================
@@ -269,12 +253,7 @@ for speed, name in [(1, "SLOW"), (2, "NORMAL"), (3, "FAST")]:
 
 def set_gear(speed: int):
     speed = clamp_speed(speed)
-
-    gear = GEAR_BY_SPEED.get(speed)
-    if gear is None:
-        raise ValueError(f"Nincs gear ehhez a speed-hez: {speed}")
-
-    rover.gear = gear
+    rover.gear = GEAR_BY_SPEED[speed]
 
 
 def current_speed() -> int:
@@ -282,7 +261,6 @@ def current_speed() -> int:
         if rover.gear == gear:
             return clamp_speed(speed)
     return 2
-
 
 # =========================================================
 # REFRESH / IDŐ SEGÉDEK
@@ -308,11 +286,6 @@ def elapsed_hrs():
 
 
 def time_of_day():
-    """
-    Ha a sim nem frissíti jól a time_of_day értéket,
-    fallbackként az eltelt órából számoljuk:
-        elapsed_hrs() % 24
-    """
     for obj, attr in [
         (Sim, "time_of_day"),
         (sim, "time_of_day"),
@@ -341,7 +314,6 @@ def is_day() -> bool:
 
 def reserve() -> float:
     return DAY_RESERVE if is_day() else NIGHT_RESERVE
-
 
 # =========================================================
 # ENERGIA SZÁMÍTÁS
@@ -375,11 +347,16 @@ def battery_after_trip_and_mine(current_battery: float, dist_blocks: int, speed:
 
 
 def energy_for_return(dist_to_base: int, daytime: bool) -> float:
-    if daytime:
-        return reserve()
+    dist_to_base = max(0, int(dist_to_base))
+    safe_dist = ceil(dist_to_base * RETURN_MARGIN)
+    return_ticks = ticks_needed(safe_dist, 1)
 
-    t = ceil(dist_to_base * RETURN_MARGIN)
-    return 2.0 * t + reserve()
+    if daytime:
+        base_need = max(1.0 * return_ticks, 0.0)
+        return base_need + DAY_RESERVE
+
+    base_need = 2.0 * return_ticks
+    return base_need + NIGHT_RESERVE
 
 
 def safe_to_go(current_battery: float, ore_dist: int, base_from_ore: int, speed: int, daytime: bool) -> bool:
@@ -387,7 +364,6 @@ def safe_to_go(current_battery: float, ore_dist: int, base_from_ore: int, speed:
     after = battery_after_trip_and_mine(current_battery, ore_dist, speed, daytime)
     need_back = energy_for_return(base_from_ore, daytime)
     return after >= need_back
-
 
 # =========================================================
 # C++ A* / PATH
@@ -419,7 +395,8 @@ def path_dist(start_xy, goal_xy):
     if not path:
         return None
 
-    # cpp path jellemzően a start utáni pontokat adja vissza
+    if path and tuple(path[0]) == tuple(start_xy):
+        return len(path) - 1
     return len(path)
 
 
@@ -431,17 +408,15 @@ def get_path_and_dist(start_xy, goal_xy):
     if not raw_path:
         return [], None
 
-    # Egységesítés:
-    # a további kódban jó, ha a teljes path első eleme az aktuális pozíció
-    if raw_path and raw_path[0] == start_xy:
-        full_path = raw_path
-        dist = len(full_path) - 1
+    normalized = [(int(p[0]), int(p[1])) for p in raw_path]
+
+    if normalized and normalized[0] == start_xy:
+        full_path = normalized
     else:
-        full_path = [start_xy] + raw_path
-        dist = len(raw_path)
+        full_path = [start_xy] + normalized
 
+    dist = len(full_path) - 1
     return full_path, dist
-
 
 # =========================================================
 # MAP / ORE SEGÉDEK
@@ -476,7 +451,6 @@ def ore_at_pos(ores, pos_xy):
             return ore
     return None
 
-
 # =========================================================
 # KLASZTER SEGÉDEK
 # =========================================================
@@ -505,7 +479,6 @@ def ores_near_anchor(ores, anchor_xy, radius=CLUSTER_RADIUS):
         return []
 
     result = []
-
     for ore in ores:
         if chebyshev_dist(ore["pos"], anchor_xy) <= radius:
             result.append(ore)
@@ -549,7 +522,6 @@ def pick_immediate_adjacent_ore(current_pos_xy, ores):
             best_dist = d
 
     return best
-
 
 # =========================================================
 # SEBESSÉGVÁLASZTÁS
@@ -634,7 +606,6 @@ def choose_live_speed(current_pos_xy, target_xy, current_battery):
 
     return clamp_speed(plan["speed"])
 
-
 # =========================================================
 # CANDIDATE ÉPÍTÉS
 # =========================================================
@@ -693,7 +664,6 @@ def build_candidate(current_pos_xy, ore, current_battery, all_ores, cluster_anch
         "score": score,
     }
 
-
 # =========================================================
 # CÉLVÁLASZTÁS
 # =========================================================
@@ -709,7 +679,6 @@ def choose_best_global_ore(current_pos_xy, ores, current_battery, cluster_anchor
             all_ores=ores,
             cluster_anchor=cluster_anchor,
         )
-
         if cand is not None:
             candidates.append(cand)
 
@@ -731,7 +700,6 @@ def choose_best_local_ore(current_pos_xy, local_ores, current_battery, all_ores,
             all_ores=all_ores,
             cluster_anchor=cluster_anchor,
         )
-
         if cand is not None:
             candidates.append(cand)
 
@@ -757,7 +725,6 @@ def choose_target(current_pos_xy, ores, current_battery, cluster_anchor=None):
 
     if should_keep_local_harvest(ores, cluster_anchor):
         local_ores = ores_near_anchor(ores, cluster_anchor, radius=CLUSTER_RADIUS)
-
         very_local = ores_near_position(local_ores, current_pos_xy, radius=LOCAL_CLEANUP_RADIUS)
 
         if very_local:
@@ -778,7 +745,6 @@ def choose_target(current_pos_xy, ores, current_battery, cluster_anchor=None):
             all_ores=ores,
             cluster_anchor=cluster_anchor,
         )
-
         if best_local is not None:
             return best_local
 
@@ -788,7 +754,6 @@ def choose_target(current_pos_xy, ores, current_battery, cluster_anchor=None):
         current_battery=current_battery,
         cluster_anchor=cluster_anchor,
     )
-
 
 # =========================================================
 # BACKEND / LOGGER
@@ -844,10 +809,7 @@ def send_live_data(current_target=None, planned_path=None):
         payload = {
             "time_of_day": float(time_of_day()),
             "elapsed_hrs": float(elapsed_hrs()),
-            "rover_position": {
-                "x": int(rover.pos.x),
-                "y": int(rover.pos.y),
-            },
+            "rover_position": {"x": int(rover.pos.x), "y": int(rover.pos.y)},
             "rover_battery": float(rover.battery),
             "rover_storage": {
                 "B": int(storage.get("B", 0)),
@@ -881,7 +843,6 @@ def send_live_data(current_target=None, planned_path=None):
     except Exception as e:
         print("send_live_data hiba:", type(e).__name__, str(e))
 
-
 # =========================================================
 # WORLD STEP
 # =========================================================
@@ -892,79 +853,128 @@ def world_step(current_target=None, planned_path=None):
     refresh_refs()
     send_live_data(current_target=current_target, planned_path=planned_path)
 
+# =========================================================
+# MOZGÁS SEGÉDEK
+# =========================================================
+
+def current_xy():
+    return (int(rover.pos.x), int(rover.pos.y))
+
+
+def normalize_path(path):
+    if not path:
+        return []
+    return [(int(p[0]), int(p[1])) for p in path]
+
+
+def trim_path_from_current(path, current_pos):
+    path = normalize_path(path)
+    if not path:
+        return []
+
+    if path[0] == current_pos:
+        return path[1:]
+
+    for i, p in enumerate(path):
+        if p == current_pos:
+            return path[i + 1:]
+
+    return path
+
+
+def next_step_chunk(path, speed):
+    path = normalize_path(path)
+    if not path:
+        return None
+
+    speed = clamp_speed(speed)
+    idx = min(speed, len(path)) - 1
+    return path[idx]
+
 
 # =========================================================
 # MOZGÁS
 # =========================================================
 
-def move_to(target_xy, path, initial_speed):
-    plan = [{"x": int(p[0]), "y": int(p[1])} for p in path] if path else []
+def move_to(target_xy, path=None, initial_speed=1, allow_abort_for_home=True):
+    """
+    Stabilabb mozgás:
+    - ha kell, minden tick előtt újrapath-el
+    - nem bízik vakon a régi remaining listában
+    - hazafelé hívható úgy is, hogy ne abortáljon
+    """
+    target_xy = (int(target_xy[0]), int(target_xy[1]))
+    timeout = 8000
+    stuck_limit = 40
+    stuck = 0
+    last_pos = current_xy()
 
-    remaining = list(path)
+    while True:
+        pos = current_xy()
 
-    if remaining and (remaining[0][0], remaining[0][1]) == (rover.pos.x, rover.pos.y):
-        remaining = remaining[1:]
+        if pos == target_xy:
+            return True
 
-    timeout = 5000
+        if allow_abort_for_home and target_xy != BASE_POS:
+            if must_go_home(pos, rover.battery):
+                print("Mozgás közben haza kell fordulni.")
+                return False
 
-    while remaining:
-        current_pos = (rover.pos.x, rover.pos.y)
-
-        if must_go_home(current_pos, rover.battery) and target_xy != BASE_POS:
-            print("Mozgás közben haza kell fordulni.")
+        live_path, dist_now = get_path_and_dist(pos, target_xy)
+        if dist_now is None or not live_path:
+            print(f"Nincs út a célhoz: {pos} -> {target_xy}")
             return False
 
+        remaining = trim_path_from_current(live_path, pos)
+        if not remaining:
+            return pos == target_xy
+
         live_speed = choose_live_speed(
-            current_pos_xy=current_pos,
+            current_pos_xy=pos,
             target_xy=target_xy,
             current_battery=rover.battery,
         )
-
         live_speed = clamp_speed(live_speed)
 
-        dist_now = path_dist(current_pos, target_xy)
-        if dist_now is not None and dist_now <= 2:
+        if initial_speed is not None:
+            live_speed = min(live_speed, clamp_speed(initial_speed))
+
+        if dist_now <= 2:
             live_speed = 1
 
+        step_target = next_step_chunk(remaining, live_speed)
+        if step_target is None:
+            return pos == target_xy
+
         set_gear(live_speed)
-
-        step_count = min(live_speed, len(remaining))
-        step_end = remaining[step_count - 1]
-        step_target = (step_end[0], step_end[1])
-
         rover.path_find_to(Vector2(step_target[0], step_target[1]))
-        world_step(current_target=target_xy, planned_path=plan)
+        send_live_data(current_target=target_xy, planned_path=live_path)
+        world_step(current_target=target_xy, planned_path=live_path)
 
         if rover.battery <= 0:
             print("Lemerült mozgás közben.")
             return False
 
-        rover_pos = (rover.pos.x, rover.pos.y)
+        new_pos = current_xy()
 
-        while remaining and (remaining[0][0], remaining[0][1]) == rover_pos:
-            remaining = remaining[1:]
+        if new_pos == target_xy:
+            return True
 
-        if remaining:
-            idx = None
-            for i, p in enumerate(remaining):
-                if (p[0], p[1]) == rover_pos:
-                    idx = i
-                    break
-            if idx is not None:
-                remaining = remaining[idx + 1:]
+        if new_pos == last_pos:
+            stuck += 1
+        else:
+            stuck = 0
+
+        last_pos = new_pos
+
+        if stuck >= stuck_limit:
+            print(f"Mozgás beragadt. pos={new_pos}, target={target_xy}")
+            return False
 
         timeout -= 1
         if timeout <= 0:
-            print("Mozgás timeout.")
+            print(f"Mozgás timeout. pos={new_pos}, target={target_xy}")
             return False
-
-    if rover.pos.x != target_xy[0] or rover.pos.y != target_xy[1]:
-        set_gear(1)
-        rover.path_find_to(Vector2(target_xy[0], target_xy[1]))
-        world_step(current_target=target_xy, planned_path=plan)
-
-    return True
-
 
 # =========================================================
 # BÁNYÁSZÁS
@@ -1008,63 +1018,136 @@ def mine_here(target_xy, path):
 
     return True
 
-
 # =========================================================
 # HAZATÉRÉS
 # =========================================================
 
+def force_go_home_stepwise():
+    """
+    Végső mentőöv:
+    mindig újratervez, mindig lassan megy, nem abortál vissza.
+    """
+    timeout = 12000
+    stuck = 0
+    last_pos = current_xy()
+
+    while True:
+        pos = current_xy()
+
+        if pos == BASE_POS:
+            return True
+
+        path_home, dist_home = get_path_and_dist(pos, BASE_POS)
+        if dist_home is None or not path_home:
+            print("Kényszerített hazamenet: nincs út haza.")
+            return False
+
+        remaining = trim_path_from_current(path_home, pos)
+        if not remaining:
+            return pos == BASE_POS
+
+        next_cell = remaining[0]
+
+        set_gear(1)
+        rover.path_find_to(Vector2(next_cell[0], next_cell[1]))
+        send_live_data(current_target=BASE_POS, planned_path=path_home)
+        world_step(current_target=BASE_POS, planned_path=path_home)
+
+        if rover.battery <= 0:
+            print("Lemerült hazamenet közben.")
+            return False
+
+        new_pos = current_xy()
+
+        if new_pos == BASE_POS:
+            return True
+
+        if new_pos == last_pos:
+            stuck += 1
+        else:
+            stuck = 0
+
+        last_pos = new_pos
+
+        if stuck >= 60:
+            print(f"Kényszerített hazamenet beragadt. pos={new_pos}")
+            return False
+
+        timeout -= 1
+        if timeout <= 0:
+            print("Kényszerített hazamenet timeout.")
+            return False
+
+
 def go_home(reason=""):
     print(f"Hazafelé indulás. Ok: {reason}")
 
-    current_pos = (rover.pos.x, rover.pos.y)
+    pos = current_xy()
 
-    if current_pos != BASE_POS:
-        path_home, dist_home = get_path_and_dist(current_pos, BASE_POS)
+    if pos == BASE_POS:
+        print(f"Már a bázison vagyunk. Akku: {rover.battery:.1f}")
+        return True
 
-        if dist_home is None:
-            print("Nincs út haza.")
-            return False
+    path_home, dist_home = get_path_and_dist(pos, BASE_POS)
+    if dist_home is None or not path_home:
+        print("Nincs út haza.")
+        return False
 
-        speed_plan = choose_best_safe_speed(
-            dist_to_target=dist_home,
-            current_battery=rover.battery,
-            dist_target_to_base=0,
-            daytime=is_day(),
-        )
+    speed_plan = choose_best_safe_speed(
+        dist_to_target=dist_home,
+        current_battery=rover.battery,
+        dist_target_to_base=0,
+        daytime=is_day(),
+    )
 
-        start_speed = speed_plan["speed"] if speed_plan is not None else 1
+    start_speed = speed_plan["speed"] if speed_plan is not None else 1
 
-        ok = move_to(BASE_POS, path_home, start_speed)
-        if not ok:
-            return False
+    # 1. normál hazamenet
+    ok = move_to(
+        BASE_POS,
+        path=path_home,
+        initial_speed=start_speed,
+        allow_abort_for_home=False,
+    )
 
-    waited = 0
-    while rover.battery < 80 and waited < 400:
-        set_gear(1)
-        world_step(current_target=None, planned_path=[])
-        waited += 1
+    if ok and current_xy() == BASE_POS:
+        print(f"Hazaértünk. Akku: {rover.battery:.1f}")
+        return True
 
-    print(f"Hazaértünk. Akku: {rover.battery:.1f}")
-    return True
+    print("Normál hazamenet nem sikerült, kényszerített hazamenet indul...")
+
+    # 2. végső fallback: lépésenként, újratervezve
+    ok_force = force_go_home_stepwise()
+    if ok_force and current_xy() == BASE_POS:
+        print(f"Hazaértünk fallback-kel. Akku: {rover.battery:.1f}")
+        return True
+
+    print(f"Nem sikerült pontosan a bázisra érni. Pozíció: {current_xy()}")
+    return False
 
 
 def must_go_home(current_pos_xy, current_battery: float) -> bool:
     dist_home = path_dist(current_pos_xy, BASE_POS)
-
     if dist_home is None:
         return False
 
-    if remaining_ticks() <= END_TICKS:
+    safe_dist_home = ceil(dist_home * RETURN_MARGIN)
+    ticks_home_needed = ticks_needed(safe_dist_home, 1)
+    time_buffer = 2
+
+    if remaining_ticks() <= ticks_home_needed + time_buffer:
+        print(
+            f"Időlimit miatt haza kell menni. "
+            f"remaining={remaining_ticks()} | need_home={ticks_home_needed + time_buffer}"
+        )
         return True
 
     need_back = energy_for_return(dist_home, is_day())
-
     if current_battery <= need_back:
         print(f"Kevés akku, haza kell menni. bat={current_battery:.1f}, need={need_back:.1f}")
         return True
 
     return False
-
 
 # =========================================================
 # HELYI TAKARÍTÁS
@@ -1074,7 +1157,10 @@ def cleanup_nearby_ores(ores, cluster_anchor):
     cleaned = 0
 
     while True:
-        current_pos = (rover.pos.x, rover.pos.y)
+        current_pos = current_xy()
+
+        if must_go_home(current_pos, rover.battery):
+            break
 
         nearby = ores_near_position(ores, current_pos, radius=LOCAL_CLEANUP_RADIUS)
         if not nearby:
@@ -1098,7 +1184,6 @@ def cleanup_nearby_ores(ores, cluster_anchor):
         cleaned += 1
 
     return cleaned
-
 
 # =========================================================
 # EGY CÉL KIBÁNYÁSZÁSA
@@ -1124,12 +1209,16 @@ def mine_one_target(ores, target_pack):
 
     send_live_data(current_target=target_xy, planned_path=path)
 
-    current_pos = (rover.pos.x, rover.pos.y)
+    current_pos = current_xy()
 
     if current_pos != target_xy:
-        ok_move = move_to(target_xy, path, speed)
+        ok_move = move_to(target_xy, path, speed, allow_abort_for_home=True)
         if not ok_move:
             return False, None
+
+    if current_xy() != target_xy:
+        print(f"Nem sikerült pontosan a célmezőre állni: {current_xy()} != {target_xy}")
+        return False, None
 
     ok_mine = mine_here(target_xy, path)
     if not ok_mine:
@@ -1142,7 +1231,6 @@ def mine_one_target(ores, target_pack):
         print("Figyelem: a kibányászott érc nem volt törölhető a listából:", target_xy)
 
     return True, target_xy
-
 
 # =========================================================
 # MAIN
@@ -1178,19 +1266,15 @@ def main():
     went_home_for_end = False
 
     while rover.battery > 0 and ores:
-        current_pos = (rover.pos.x, rover.pos.y)
+        current_pos = current_xy()
 
         if must_go_home(current_pos, rover.battery):
             ok_home = go_home("akku vagy időlimit")
             if not ok_home:
                 break
 
-            if remaining_ticks() <= END_TICKS:
-                went_home_for_end = True
-                break
-
-            cluster_anchor = None
-            continue
+            went_home_for_end = True
+            break
 
         best = choose_target(
             current_pos_xy=current_pos,
@@ -1215,12 +1299,22 @@ def main():
         ok, _ = mine_one_target(ores, best)
         if not ok:
             print("A cél kibányászása sikertelen volt.")
+            if current_xy() != BASE_POS:
+                go_home("sikertelen cél után")
             break
 
         mined_count += 1
 
         cleaned_now = cleanup_nearby_ores(ores, cluster_anchor)
         mined_count += cleaned_now
+
+        if must_go_home(current_xy(), rover.battery):
+            ok_home = go_home("cleanup után időlimit vagy akku")
+            if not ok_home:
+                break
+
+            went_home_for_end = True
+            break
 
         if not should_keep_local_harvest(ores, cluster_anchor):
             cluster_anchor = None
@@ -1234,7 +1328,7 @@ def main():
         )
 
     if not went_home_for_end:
-        if (rover.pos.x, rover.pos.y) != BASE_POS:
+        if current_xy() != BASE_POS:
             go_home("szimuláció vége")
 
     storage = {"Y": 0, "G": 0, "B": 0}
@@ -1257,7 +1351,7 @@ def main():
     print(f"Végső akku: {rover.battery:.1f}")
     print(f"Eltelt idő: {elapsed_hrs():.1f} h")
     print(f"Path cache méret: {len(_path_cache)}")
-    final_pos = (rover.pos.x, rover.pos.y)
+    final_pos = current_xy()
     print(f"Bázison van: {'IGEN' if final_pos == BASE_POS else 'NEM'} | pozíció={final_pos}")
     print("=" * 60)
 
