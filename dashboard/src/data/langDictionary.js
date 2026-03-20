@@ -135,16 +135,16 @@
     EN: 'Team introduction',
   },
   section_team_intro_text: {
-    HU: 'Ide kerül a csapat leírása.',
-    EN: 'The team description goes here.',
+    HU: 'A BMSZC Puskás Tivadar Távközlési és Informatikai Technikum tanulői vagyunk, 11. évfolyamon tanulunk Szoftverfejlesztő és Tesztelő szakirányon.',
+    EN: 'We are students at the BMSZC Puskás Tivadar Telecommunications and Information Technology Technical School, currently in the 11th grade, specializing in Software Development and Testing.',
   },
   section_motivation_title: {
     HU: 'Motiváció',
     EN: 'Motivation',
   },
   section_motivation_text: {
-    HU: 'Ide kerül a motiváció leírása.',
-    EN: 'The motivation description goes here.',
+    HU: 'Nagy érdeklődéssel fordulunk az informatika világa felé, folyamatosan kutatva az új technológiákat és a hatékonyabb megoldásokat. Lépést tartunk a fejlődéssel, és nemcsak programozási tudásunkat fejlesztjük, hanem problémamegoldó készségeinket is folyamatosan erősítjük..',
+    EN: 'We turn to the world of information technology with great interest, constantly exploring new technologies and more efficient solutions. We keep pace with developments, continuously enhancing not only our programming skills but also strengthening our problem-solving abilities.',
   },
 
   // Operation card
@@ -168,21 +168,21 @@
     HU: 'Render',
     EN: 'Render',
   },
-  card_operation_section_architecture_title: {
-    HU: 'Architektúra',
-    EN: 'Architecture',
+  card_operation_section_frontend_title: {
+    HU: 'Frontend',
+    EN: 'Frontend',
   },
-  card_operation_section_architecture_text: {
-    HU: 'Ide kerül az architektúra leírása.',
-    EN: 'The architecture description goes here.',
+  card_operation_section_frontend_text: {
+    HU: 'Vue-val készült, 2D és 3D-s vizualizáció. Az összeköttető szerverrel webscoket-el kommunikál',
+    EN: 'Developed with Vue, featuring 2D and 3D visualizations. Communicates with the connecting server via WebSockets.',
   },
-  card_operation_section_technologies_title: {
-    HU: 'Technológiák',
-    EN: 'Technologies',
+  card_operation_section_backend_title: {
+    HU: 'Backend',
+    EN: 'Backend',
   },
-  card_operation_section_technologies_text: {
-    HU: 'Ide kerülnek a technológiák.',
-    EN: 'The technologies go here.',
+  card_operation_section_backend_text: {
+    HU: 'PPO alapú deep reinforcement learning algoritmus-al képzett modellek, illetve egy optimalizált nem ML alapján készült bányászó algoritmus. A* útvonal tervező algoritmus, c++ -ban optimalizálva.',
+    EN: 'Models trained with PPO-based deep reinforcement learning algorithms, as well as an optimized mining algorithm developed without machine learning. An A* pathfinding algorithm, optimized in C++.',
   },
 
   // Docs card

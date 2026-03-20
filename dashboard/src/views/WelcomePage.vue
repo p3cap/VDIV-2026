@@ -66,8 +66,8 @@ const cards = [
 			{ label: 'card_operation_stat_render', value: 'Machine Learning, C++ pathfinding' },
 		],
 		sections: [
-			{ title: 'card_operation_section_architecture_title', text: 'card_operation_section_architecture_text' },
-			{ title: 'card_operation_section_technologies_title', text: 'card_operation_section_technologies_text' },
+			{ title: 'card_operation_section_frontend_title', text: 'card_operation_section_frontend_text' },
+			{ title: 'card_operation_section_backend_title', text: 'card_operation_section_backend_text' },
 		],
 	},
 	{
