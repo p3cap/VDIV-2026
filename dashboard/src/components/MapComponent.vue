@@ -23,6 +23,7 @@ import blue from '@/assets/default/lapis.webp'
 import green from '@/assets/default/copper.webp'
 import yellow from '@/assets/default/gold.jpeg'
 import roverImg from '@/assets/rover.png'
+import start from '@/assets/start.png'
 
 const textureFiles = import.meta.glob('@/assets/**/*.png', { eager: true, as: 'url' })
 const textureIndex = Object.entries(textureFiles).reduce((acc, [path, url]) => {
@@ -66,11 +67,12 @@ const defaultTextureUrls = {
     yellow: yellow,
     green: green,
     rover: roverImg,
+    start : start,
 }
 
 const textureKeysByCell = {
     '.': 'ground',
-    S: 'ground',
+    S: 'start',
     '#': 'barrier',
     B: 'blue',
     Y: 'yellow',
