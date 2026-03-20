@@ -6,14 +6,7 @@ import numpy as np
 from typing import List, Optional
 from enum import Enum
 from pathlib import Path as FilePath
-
-# Optional C++ backend for A* (pybind11 module). Imported once at module level.
-try:
-	import cpp_path as _cpp_mod
-	_CPP_AVAILABLE = True
-except:
-	_cpp_mod = None
-	_CPP_AVAILABLE = False
+from _cpp_path_loader import CPP_AVAILABLE as _CPP_AVAILABLE, cpp_mod as _cpp_mod
 
 class STATUS(Enum):
 	MINE = "mine"

@@ -1,3 +1,5 @@
+import math
+
 from MapClass import Map
 from Global import Vector2
 
@@ -36,30 +38,25 @@ class Simulation:
 			return 0.0
 
 		cycle = self.day_hrs + self.night_hrs
-		
-		# Normalize to cycle phase
-		start_phase = start_hrs % cycle
-		end_phase = end_hrs % cycle
-		
-		# Case 1: interval does NOT wrap the cycle boundary
-		if end_hrs - start_hrs < cycle and end_phase > start_phase:
-			# simple case: no wrap
-			daytime = max(0, min(end_phase, self.day_hrs) - min(start_phase, self.day_hrs))
-		else:
-			# Case 2: interval wraps cycle boundary OR spans >= 1 full cycle
-			# Calculate daytime in partial first cycle
-			first_part = max(0, self.day_hrs - min(start_phase, self.day_hrs))
-			
-			# Full cycles in between
-			full_cycles = int((end_hrs - start_hrs - first_part) // cycle)
-			full_cycle_daytime = full_cycles * self.day_hrs
-			
-			# Partial last cycle
-			remaining = (end_hrs - start_hrs) - first_part - (full_cycles * cycle)
-			last_part = min(remaining, self.day_hrs) if remaining > 0 else 0
-			
-			daytime = first_part + full_cycle_daytime + last_part
-		
+		daytime = 0.0
+		current = start_hrs
+
+		while current < end_hrs:
+			cycle_index = math.floor(current / cycle)
+			cycle_start = cycle_index * cycle
+			cycle_end = cycle_start + cycle
+			window_end = min(end_hrs, cycle_end)
+
+			day_start = cycle_start
+			day_end = cycle_start + self.day_hrs
+
+			overlap_start = max(current, day_start)
+			overlap_end = min(window_end, day_end)
+			if overlap_end > overlap_start:
+				daytime += overlap_end - overlap_start
+
+			current = window_end
+
 		return daytime
 
 # ------- Print helper --------

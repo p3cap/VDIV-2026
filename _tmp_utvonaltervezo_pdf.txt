@@ -1,0 +1,87 @@
+--- PAGE 1 ---
+Útvonaltervező algoritmus (A*) leírása pszeudo 
+kóddal 
+ 
+ 
+FÜGGVÉNY get_neighbors(térkép, csomópont) -> lista: 
+  irányok = [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)] 
+  eredmény = [] 
+ 
+  MINDEN (dx, dy) IN irányok: 
+    szomszéd = (csomópont.x + dx, csomópont.y + dy) 
+ 
+    HA NEM térkép.járható(szomszéd) AKKOR FOLYTASD 
+ 
+    HA dx != 0 ÉS dy != 0 AKKOR: 
+      HA NEM térkép.járható((csomópont.x+dx, csomópont.y)) 
+      VAGY NEM térkép.járható((csomópont.x, csomópont.y+dy)) AKKOR: 
+        FOLYTASD  // sarokvágás tiltva 
+      VÉGE 
+    VÉGE 
+ 
+    eredmény.HOZZÁAD(szomszéd) 
+  VÉGE 
+  VISSZAAD eredmény 
+VÉGE 
+ 
+ 
+FÜGGVÉNY heurisztika(a, b) -> egész: 
+  dx = |a.x - b.x| 
+  dy = |a.y - b.y| 
+  VISSZAAD 10 * max(dx, dy) + 4 * min(dx, dy) 
+VÉGE 
+ 
+  
+
+--- PAGE 2 ---
+FÜGGVÉNY astar(térkép, start, cél) -> lista[(x,y)]: 
+ 
+  HA start == cél                  AKKOR VISSZAAD [start] 
+  HA NEM térkép.járható(start)     AKKOR VISSZAAD [] 
+  HA NEM térkép.járható(cél)       AKKOR VISSZAAD [] 
+ 
+  nyílt_halmaz   = MinHalom() 
+  g_érték        = 2D tömb [magasság x szélesség] = VÉGTELEN 
+  szülő          = 2D tömb [magasság x szélesség] 
+  van_szülő      = 2D tömb [magasság x szélesség] = HAMIS 
+ 
+  g_érték[start] = 0 
+  nyílt_halmaz.BETESZ((f=0, poz=start)) 
+ 
+  AMÍG nyílt_halmaz NEM ÜRES: 
+    elem    = nyílt_halmaz.KIVESZ() 
+    jelenlegi = elem.poz 
+ 
+    HA elem.f > g_érték[jelenlegi] + heurisztika(jelenlegi, cél) AKKOR FOLYTASD 
+ 
+    HA jelenlegi == cél AKKOR KILÉP 
+ 
+    MINDEN szomszéd IN get_neighbors(térkép, jelenlegi): 
+      dx = |szomszéd.x - jelenlegi.x| 
+      dy = |szomszéd.y - jelenlegi.y| 
+      költség = HA (dx==0 VAGY dy==0) AKKOR 10 KÜLÖNBEN 14 
+ 
+      próba_g = g_érték[jelenlegi] + költség 
+ 
+      HA próba_g < g_érték[szomszéd] AKKOR: 
+        szülő[szomszéd]     = jelenlegi 
+        van_szülő[szomszéd] = IGAZ 
+        g_érték[szomszéd]   = próba_g 
+        f = próba_g + heurisztika(szomszéd, cél) 
+        nyílt_halmaz.BETESZ((f, szomszéd)) 
+      VÉGE 
+    VÉGE 
+  VÉGE 
+ 
+  HA NEM van_szülő[cél] AKKOR VISSZAAD [] 
+ 
+  útvonal = [] 
+  jelenlegi = cél 
+  AMÍG van_szülő[jelenlegi]: 
+    útvonal.HOZZÁAD(jelenlegi) 
+    jelenlegi = szülő[jelenlegi] 
+  VÉGE 
+  VISSZAAD [start] + MEGFORDÍT(útvonal) 
+VÉGE 
+ 
+

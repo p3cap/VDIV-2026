@@ -8,14 +8,7 @@ from Simulation_env import RoverSimulationWorld
 from RoverClass import STATUS, GEARS
 from Global import Vector2
 from RoverLogger import RoverLogger
-
-# Optional C++ backend for A* (pybind11 module). Imported once at module level.
-try:
-    import cpp_path as cpp_mod
-    CPP_AVAILABLE = True
-except Exception:
-    cpp_mod = None
-    CPP_AVAILABLE = False
+from _cpp_path_loader import CPP_AVAILABLE, cpp_mod
 
 MARS_ROOT = Path(__file__).resolve().parent
 DEFAULT_MAP_NAME = "mars_map_50x50.csv"

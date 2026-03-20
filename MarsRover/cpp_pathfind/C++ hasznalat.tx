@@ -1,0 +1,13 @@
+Visual Studio Installerben telepitsd a "Desktop development with C++" komponenst.
+Az import maradhat ez:
+import requests
+import cpp_path as cpp_mod
+
+Hasznalat:
+cpp_mod.astar_from_csv(CSV_PATH, start_xy, goal_xy)
+
+Ha ujra kell telepiteni a modult:
+cd <repo>\MarsRover\cpp_pathfind
+python -m pip uninstall -y cpp_path
+python -m pip install .
+python -c "import cpp_path; print(cpp_path.__file__)"
