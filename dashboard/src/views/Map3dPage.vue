@@ -37,7 +37,7 @@ const ready = computed(
 // ─── Map props ────────────────────────────────────────────────────────────────
 const mapMatrix     = computed(() => setup.value.map_matrix ?? [])
 const roverPosition = computed(() => dash.value.rover_position ?? { x: 0, y: 0 })
-const pathPlan      = computed(() => dash.value.rover_path_plan ?? dash.value.path_plan ?? [])
+const pathPlan      = computed(() => dash.value.rover_path_abs ?? dash.value.rover_path_plan ?? dash.value.path_plan ?? [])
 const minedCells    = computed(() => dash.value.rover_mined ?? [])
 
 // ─── HUD props — rover status ─────────────────────────────────────────────────

@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Map2dPage from "@/views/Map2dPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
-import SettingsComponent from "@/components/SettingsComponent.vue";
 import Map3dPage from "@/views/Map3dPage.vue";
 import DocumentationPage from "@/views/DocumentationPage.vue";
 import WelcomePage from "@/views/WelcomePage.vue";
@@ -26,11 +25,6 @@ const routes = [
     path: "/map3d",
     name: "map3d",
     component: Map3dPage,
-  },
-  {
-    path: "/settings",
-    name: "settings",
-    component: SettingsComponent
   },
   {
     path : "/documentation",

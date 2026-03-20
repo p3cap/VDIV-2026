@@ -37,7 +37,9 @@ from ppo_shared import (
     compute_reward,
     obs_size,
     rank_minerals,
+    return_focus_window_hrs,
     snap_gear,
+    tile_step_distance,
 )
 
 
@@ -71,9 +73,9 @@ class MinuteProgressCallback(BaseCallback):
         done      = max(0, int(self.model.num_timesteps) - self._steps_start)
         pct       = min(100.0, done / self.total_timesteps * 100.0)
         fps       = done / elapsed
-        remaining = (self.total_timesteps - done) / max(1.0, fps)
+        remaining = (self.total_timesteps - done) / max(1.0, fps) /3600
         print(f"[PPO] {done:>10,}/{self.total_timesteps:,}  ({pct:5.1f}%)"
-              f"  elapsed={elapsed:7.1f}s  fps={fps:7.1f}  eta={remaining:7.1f}s", flush=True)
+              f"  elapsed={elapsed:7.1f}s  fps={fps:7.1f}  eta={remaining:7.1f}hrs", flush=True)
 
     def _on_step(self) -> bool:
         # cheap gate: only hit perf_counter every check_every_steps
@@ -98,8 +100,7 @@ class RoverEnv(gym.Env):
     NO_MOVE_PENALTY_BASE   = 6.0
     NO_MOVE_PENALTY_STREAK = 2.0
     NO_MOVE_PENALTY_CAP    = 30.0
-    RETURN_HOME_BONUS_MAX  = 500.0
-    RETURN_HOME_WINDOW     = 0.2
+    RETURN_HOME_MIN_HRS    = 5.0
     RETURN_HOME_MIN_MINED  = 1
     MINERAL_COUNT          = DEFAULT_MINERAL_COUNT
 
@@ -152,7 +153,10 @@ class RoverEnv(gym.Env):
         self._mining_streak  = 0
         self._no_mine_streak = 0
         self._total_mined    = 0
+        self._travel_since_mine = 0.0
+        self._return_focus      = False
         self._last_delta_hrs = self.delta_hrs
+        self._max_home_dist  = max(1.0, float(max(self.map_w - 1, self.map_h - 1)))
         # mineral cache: list of (Vector2, manhattan_dist)
         self._mineral_cache: list[tuple] = []
         self._minerals_dirty = True
@@ -175,10 +179,44 @@ class RoverEnv(gym.Env):
             obs_buf=self._obs_buf,
         )
 
+    def _home_dist(self, rover_pos: Vector2) -> float:
+        return float(tile_step_distance(rover_pos, self._start_pos))
+
+    def _return_window_hrs(self, rover_pos: Vector2) -> float:
+        return return_focus_window_hrs(
+            rover_pos,
+            self._start_pos,
+            min_window_hrs=self.RETURN_HOME_MIN_HRS,
+        )
+
+    def _update_return_focus(self, rover_pos: Vector2, time_left_hrs: float, minerals_left: int | None = None) -> bool:
+        if self._return_focus:
+            return True
+        if minerals_left == 0:
+            self._return_focus = True
+            return True
+        if self._total_mined < self.RETURN_HOME_MIN_MINED:
+            return False
+        if time_left_hrs <= self._return_window_hrs(rover_pos):
+            self._return_focus = True
+        return self._return_focus
+
     # ── reward ────────────────────────────────────────────────────
 
-    def _reward(self, mined_now: int, dist_gain: float,
-                battery_cost: float, minerals_left: int, is_dead: bool) -> float:
+    def _reward(
+        self,
+        mined_now: int,
+        dist_gain: float,
+        battery_cost: float,
+        minerals_left: int,
+        is_dead: bool,
+        travel_since_last_mine: float,
+        home_dist_before: float,
+        home_dist_after: float,
+    ) -> float:
+        sim = self.world.sim
+        time_left_hrs = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
+        return_window_hrs_value = self._return_window_hrs(self.world.rover.pos)
         is_mining = self.world.rover.status == STATUS.MINE
         reward, self._no_move_streak, self._mining_streak, self._no_mine_streak = compute_reward(
             mined_now=mined_now,
@@ -193,25 +231,15 @@ class RoverEnv(gym.Env):
             penalty_base=self.NO_MOVE_PENALTY_BASE,
             penalty_streak=self.NO_MOVE_PENALTY_STREAK,
             penalty_cap=self.NO_MOVE_PENALTY_CAP,
+            travel_since_last_mine=travel_since_last_mine,
+            return_focus_active=self._return_focus,
+            home_dist_before=home_dist_before,
+            home_dist_after=home_dist_after,
+            time_left_hrs=time_left_hrs,
+            return_window_hrs_value=return_window_hrs_value,
+            max_home_dist=self._max_home_dist,
         )
-        sim = self.world.sim
-        run_hrs = max(1e-6, float(sim.run_hrs))
-        time_left_frac = max(0.0, (run_hrs - float(sim.elapsed_hrs)) / run_hrs)
-        if (not is_dead) and self._total_mined >= self.RETURN_HOME_MIN_MINED:
-            bonus = self._return_home_bonus(self.world.rover.pos)
-            if sim.is_running and time_left_frac <= self.RETURN_HOME_WINDOW:
-                window_hrs = max(1e-6, self.RETURN_HOME_WINDOW * run_hrs)
-                step_scale = min(1.0, max(0.0, self._last_delta_hrs / window_hrs))
-                reward += bonus * step_scale
-            elif not sim.is_running:
-                reward += bonus
         return reward
-
-    def _return_home_bonus(self, rover_pos: Vector2) -> float:
-        max_dist = max(1.0, float((self.map_w - 1) + (self.map_h - 1)))
-        dist = abs(rover_pos.x - self._start_pos.x) + abs(rover_pos.y - self._start_pos.y)
-        closeness = max(0.0, 1.0 - (dist / max_dist))
-        return self.RETURN_HOME_BONUS_MAX * closeness
 
     # ── gym API ───────────────────────────────────────────────────
 
@@ -227,6 +255,8 @@ class RoverEnv(gym.Env):
         self._mining_streak  = 0
         self._no_mine_streak = 0
         self._total_mined    = 0
+        self._travel_since_mine = 0.0
+        self._return_focus      = False
         self._cycle_hrs      = self.world.sim.day_hrs + self.world.sim.night_hrs
         self._minerals_dirty = True
         self._rebuild_mineral_cache()
@@ -234,14 +264,19 @@ class RoverEnv(gym.Env):
 
     def step(self, action: np.ndarray):
         rover = self.world.rover
+        sim = self.world.sim
 
         # gear applies every step
         rover.gear = snap_gear(action[0])
+        time_left_before = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
+        self._update_return_focus(rover.pos, time_left_before)
+        home_dist_before = self._home_dist(rover.pos)
+        travel_since_last_mine = self._travel_since_mine
 
         # navigation / mining only when rover is free to receive a new command
         if rover.status == STATUS.IDLE:
             tile = self.world.sim.map_obj.get_tile(rover.pos)
-            if tile in self.world.sim.map_obj.mineral_markers:
+            if (not self._return_focus) and tile in self.world.sim.map_obj.mineral_markers:
                 rover.mine()
             else:
                 gx = float(np.clip(action[1], 0.0, 1.0))
@@ -261,21 +296,36 @@ class RoverEnv(gym.Env):
 
         self._total_mined = len(rover.mined)
         mined_now = self._total_mined - prev_mined
+        dist_gain = float(rover.distance_travelled - prev_dist)
         if mined_now > 0:
             self._prev_mined     = rover.pos
             self._minerals_dirty = True
+            self._travel_since_mine = 0.0
+        else:
+            self._travel_since_mine += dist_gain
 
         # rebuild mineral cache when minerals changed or rover moved
         if self._minerals_dirty or rover.distance_travelled != prev_dist:
             self._rebuild_mineral_cache()
 
         battery_cost  = max(0.0, prev_battery - rover.battery)
-        dist_gain     = float(rover.distance_travelled - prev_dist)
         minerals_left = len(self._mineral_cache)
+        time_left_after = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
+        self._update_return_focus(rover.pos, time_left_after, minerals_left=minerals_left)
+        home_dist_after = self._home_dist(rover.pos)
         is_dead       = rover.status == STATUS.DEAD
-        terminated    = is_dead or minerals_left == 0 or not self.world.sim.is_running
+        terminated    = is_dead or not self.world.sim.is_running or (minerals_left == 0 and home_dist_after <= 0)
 
-        reward = self._reward(mined_now, dist_gain, battery_cost, minerals_left, is_dead)
+        reward = self._reward(
+            mined_now,
+            dist_gain,
+            battery_cost,
+            minerals_left,
+            is_dead,
+            travel_since_last_mine,
+            home_dist_before,
+            home_dist_after,
+        )
         return self._obs(), float(reward), terminated, False, {}
 
 
@@ -422,7 +472,8 @@ def train_model(
         f"no_move_penalty_base={RoverEnv.NO_MOVE_PENALTY_BASE}",
         f"no_move_penalty_streak={RoverEnv.NO_MOVE_PENALTY_STREAK}",
         f"no_move_penalty_cap={RoverEnv.NO_MOVE_PENALTY_CAP}",
-        f"return_home_bonus_max={RoverEnv.RETURN_HOME_BONUS_MAX}",
+        f"return_home_min_hours={RoverEnv.RETURN_HOME_MIN_HRS}",
+        f"return_home_min_mined={RoverEnv.RETURN_HOME_MIN_MINED}",
         "",
         "# PPO",
         f"timesteps_target={timesteps}",

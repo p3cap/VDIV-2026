@@ -1,23 +1,4 @@
 <script setup>
-/**
- * RoverInstruments.vue
- *
- * Pure presentational instruments panel.
- * - Speedometer: SVG arc gauge, needle sweeps 0 → maxSpeed.
- * - Gear display: shows current operating mode as a styled gear badge.
- *
- * Arc geometry:
- *   Start: 225° (bottom-left, 7 o'clock position)
- *   Sweep: 270° clockwise
- *   End:   135° (bottom-right, 5 o'clock position)
- *
- *   SVG angles measured clockwise from 3 o'clock (standard canvas convention).
- *   0°=right, 90°=down, 180°=left, 270°=up.
- *   So 225° = bottom-left, 225+270=495 mod 360 = 135° = bottom-right. ✓
- *
- *   The arc always sweeps clockwise (sweep-flag = 1).
- *   large-arc-flag = 1 when the swept angle exceeds 180°.
- */
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps({

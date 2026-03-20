@@ -21,7 +21,9 @@ from ppo_shared import (
     compute_reward,
     obs_size,
     rank_minerals,
+    return_focus_window_hrs,
     snap_gear,
+    tile_step_distance,
 )
 
 ML_ROOT = Path(__file__).parent
@@ -113,6 +115,9 @@ def debug_log(
 class LivePolicyEnv:
     """Minimal policy inference wrapper over RoverSimulationWorld."""
 
+    RETURN_HOME_MIN_HRS = 5.0
+    RETURN_HOME_MIN_MINED = 1
+
     def __init__(self, run_hrs: float, mineral_count: int, delta_mode: str, set_delta_hrs: float, tick_seconds: float, env_speed: float, base_url: str, send_every: int, map_csv_path: Optional[str] = None):
         self.mineral_count = mineral_count
         self.prev_mined = None
@@ -120,6 +125,9 @@ class LivePolicyEnv:
         self._no_move_streak = 0
         self._mining_streak = 0
         self._no_mine_streak = 0
+        self._travel_since_mine = 0.0
+        self._travel_for_reward = 0.0
+        self._return_focus = False
         self.world = RoverSimulationWorld(
             run_hrs=run_hrs,
             delta_mode=delta_mode,
@@ -131,11 +139,37 @@ class LivePolicyEnv:
             send_every=send_every,
             map_csv_path=map_csv_path,
         )
+        self._start_pos = Vector2(self.world.rover.pos.x, self.world.rover.pos.y)
+        self._max_home_dist = max(1.0, float(max(self.world.map_width - 1, self.world.map_height - 1)))
+        self._home_dist_before = 0.0
+        self._home_dist_after = 0.0
         self.obs_size = obs_size(self.mineral_count)  # input size
         self._obs_buf = np.zeros(self.obs_size, dtype=np.float32)
 
     def _ranked_minerals(self): # get mineral distances
         return rank_minerals(self.world, self.mineral_count)
+
+    def _home_dist(self, rover_pos: Vector2) -> float:
+        return float(tile_step_distance(rover_pos, self._start_pos))
+
+    def _return_window_hrs(self, rover_pos: Vector2) -> float:
+        return return_focus_window_hrs(
+            rover_pos,
+            self._start_pos,
+            min_window_hrs=self.RETURN_HOME_MIN_HRS,
+        )
+
+    def _update_return_focus(self, rover_pos: Vector2, time_left_hrs: float, minerals_left: int | None = None) -> bool:
+        if self._return_focus:
+            return True
+        if minerals_left == 0:
+            self._return_focus = True
+            return True
+        if self.total_mined < self.RETURN_HOME_MIN_MINED:
+            return False
+        if time_left_hrs <= self._return_window_hrs(rover_pos):
+            self._return_focus = True
+        return self._return_focus
 
     def obs(self): # NN Inputs
         ranked = self._ranked_minerals()
@@ -149,14 +183,19 @@ class LivePolicyEnv:
 
     def step(self, action: np.ndarray) -> tuple[bool, float, float]:
         rover = self.world.rover
+        sim = self.world.sim
 
         # gear applies every step
         rover.gear = snap_gear(action[0])
+        time_left_before = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
+        self._update_return_focus(rover.pos, time_left_before)
+        self._home_dist_before = self._home_dist(rover.pos)
+        self._travel_for_reward = self._travel_since_mine
 
         # navigation / mining only when rover is free to receive a new command
         if rover.status == STATUS.IDLE:
             tile = self.world.sim.map_obj.get_tile(rover.pos)
-            if tile in self.world.sim.map_obj.mineral_markers:
+            if (not self._return_focus) and tile in self.world.sim.map_obj.mineral_markers:
                 rover.mine()
             else:
                 gx = float(np.clip(action[1], 0.0, 1.0))
@@ -167,17 +206,28 @@ class LivePolicyEnv:
                 if target != rover.pos:
                     rover.path_find_to(target)
 
+        before_dist = rover.distance_travelled
         before_mined = self.total_mined
         delta_hrs, real_dt_seconds = self.world.step(sleep=True)
-        sim = self.world.sim
         self.total_mined = len(rover.mined)
+        dist_gain = float(rover.distance_travelled - before_dist)
         if self.total_mined > before_mined:
             self.prev_mined = rover.pos
+            self._travel_since_mine = 0.0
+        else:
+            self._travel_since_mine += dist_gain
 
-        done = (rover.status == STATUS.DEAD) or (len(self.world.minerals()) == 0) or (not sim.is_running)
+        minerals_left = len(self.world.minerals())
+        time_left_after = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
+        self._update_return_focus(rover.pos, time_left_after, minerals_left=minerals_left)
+        self._home_dist_after = self._home_dist(rover.pos)
+
+        done = (rover.status == STATUS.DEAD) or (not sim.is_running) or (minerals_left == 0 and self._home_dist_after <= 0)
         return done, delta_hrs, real_dt_seconds
 
     def reward(self, mined_now: int, dist_gain: float, battery_cost: float, minerals_left: int, is_dead: bool) -> float:
+        sim = self.world.sim
+        time_left_hrs = max(0.0, float(sim.run_hrs) - float(sim.elapsed_hrs))
         reward, self._no_move_streak, self._mining_streak, self._no_mine_streak = compute_reward(
             mined_now=mined_now,
             dist_gain=dist_gain,
@@ -188,6 +238,13 @@ class LivePolicyEnv:
             no_move_streak=self._no_move_streak,
             mining_streak=self._mining_streak,
             no_mine_streak=self._no_mine_streak,
+            travel_since_last_mine=self._travel_for_reward,
+            return_focus_active=self._return_focus,
+            home_dist_before=self._home_dist_before,
+            home_dist_after=self._home_dist_after,
+            time_left_hrs=time_left_hrs,
+            return_window_hrs_value=self._return_window_hrs(self.world.rover.pos),
+            max_home_dist=self._max_home_dist,
         )
         return reward
 
