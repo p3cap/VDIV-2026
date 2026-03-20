@@ -103,8 +103,8 @@
     EN: 'Backend',
   },
   member_torontali_bio: {
-    HU: 'backendcppvalami',
-    EN: 'backendcppsomething',
+    HU: 'A projekt során én fejlesztettem a C++ alapú A* algoritmust, valamint megvalósítottam a C++ és Python közötti integrációt. Emellett a brain.py modul teljes logikáját is én terveztem és készítettem.',
+    EN: 'I implemented the A* algorithm in C++, developed the integration between C++ and Python, and designed and built the full logic of the brain.py module.',
   },
   member_kovacs_name: {
     HU: 'Kovács Dávid',

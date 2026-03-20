@@ -607,7 +607,7 @@
     height: calc(100vh - var(--navbar-h));
   }
 
-  /* ── Instruments → fixed bottom bar ── */
+  /* ── Instruments ── */
   .map3d-page .instruments-anchor {
     position: fixed;
     bottom: 10;

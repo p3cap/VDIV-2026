@@ -1,3 +1,154 @@
-.gombocska {
-    margin-left: 300px;
+/* ── Overlay ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 7, 15, 0.75);
+  backdrop-filter: var(--blur-md);
+  opacity: 0;
+}
+
+/* ── Popup ── */
+.popup {
+  font-family: var(--font-ui);
+  width: min(320px, 88vw);
+  background: var(--clr-abyss);
+  border: var(--border-accent);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float), var(--accent-glow);
+  overflow: hidden;
+  opacity: 0;
+}
+
+/* ── Header ── */
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+}
+
+.popup-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.btn-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: var(--border-subtle);
+  border-radius: var(--r-sm);
+  background: var(--clr-surface);
+  color: var(--txt-secondary);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.btn-close:hover {
+  background: var(--clr-raised);
+  color: var(--accent);
+  border-color: rgba(0, 255, 200, 0.35);
+}
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  margin: 0 var(--sp-4);
+  background: linear-gradient(90deg, transparent, rgba(0,255,200,0.12) 20%, rgba(0,255,200,0.12) 80%, transparent);
+}
+
+/* ── List ── */
+.lang-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.lang-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
+  border: var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--clr-surface);
+  cursor: pointer;
+  overflow: hidden;
+  opacity: 0;
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+
+/* cyan shimmer on hover/active */
+.lang-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, var(--accent-ghost) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+  pointer-events: none;
+}
+
+.lang-item:hover {
+  border-color: rgba(0, 255, 200, 0.25);
+  background: var(--clr-raised);
+  transform: translateX(3px);
+}
+.lang-item:hover::after { opacity: 1; }
+
+.lang-item.active {
+  border-color: rgba(0, 255, 200, 0.45);
+  background: var(--accent-ghost);
+  box-shadow: var(--accent-glow);
+}
+.lang-item.active::after { opacity: 1; }
+
+/* ── Flag ── */
+.lang-flag {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--txt-secondary);
+  transition: color var(--t-fast);
+}
+
+.lang-item.active .lang-flag {
+  color: var(--accent);
+}
+
+/* ── Label ── */
+.lang-label {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--txt-primary);
+  transition: color var(--t-fast);
+}
+
+.lang-item.active .lang-label {
+  color: var(--accent);
 }

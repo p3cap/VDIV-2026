@@ -9,7 +9,6 @@ from RoverClass import STATUS, GEARS
 from Global import Vector2
 from RoverLogger import RoverLogger
 
-# Optional C++ backend for A* (pybind11 module). Imported once at module level.
 try:
     import cpp_path as cpp_mod
     CPP_AVAILABLE = True
