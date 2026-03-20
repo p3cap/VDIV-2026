@@ -36,6 +36,7 @@ import {
   TubeGeometry,
   Vector3,
   WebGLRenderer,
+  IcosahedronGeometry
 } from 'three'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -99,10 +100,18 @@ let ambientLight, sunLight
 
 // ─── Shared static assets ─────────────────────────────────────────────────────
 const S = {
-  gTile: null, gBarrier: null, gGold: null, gIceCone: null,
-  gGreenStem: null, gGreenCap: null, gPole: null, gFlag: null, gPit: null,
-  mTile: null, mBarrier: null, mGold: null, mIce: null, mGreen: null,
-  mGreenDark: null, mStart: null, mPole: null, mMined: null,
+  gTile: null,
+  gBarrier: null, gBarrierB: null, gBarrierC: null, gBarrierSlab: null,
+  gGoldCryst: null, gGoldBase: null,
+  gIceCryst: null, gIceBase: null,
+  gGreenOrb: null, gGreenSpike: null,
+  gPole: null, gFlag: null, gPit: null,
+  mTile: null,
+  mBarrier: null, mBarrierDark: null, mBarrierLight: null, mBarrierMid: null,
+  mGold: null, mGoldVein: null, mGoldRock: null,
+  mIce: null, mIceCore: null, mIceRock: null,
+  mGreen: null, mGreenDark: null, mGreenRock: null,
+  mStart: null, mPole: null, mMined: null,
 }
 
 let pathTubeMesh = null
@@ -111,27 +120,55 @@ let roverHeadingTarget  = 0
 let roverHeadingCurrent = 0
 
 function buildShared() {
-  S.gTile      = new PlaneGeometry(CELL - 0.1, CELL - 0.1)
-  S.gBarrier   = new BoxGeometry(CELL * 0.8, 1.0, CELL * 0.8)
-  S.gGold      = new OctahedronGeometry(0.26)
-  S.gIceCone   = new ConeGeometry(0.15, 0.65, 5)
-  S.gGreenStem = new CylinderGeometry(0.07, 0.1, 0.36, 6)
-  S.gGreenCap  = new SphereGeometry(0.28, 6, 5)
-  S.gPole      = new CylinderGeometry(0.03, 0.03, 0.88, 5)
-  S.gFlag      = new BoxGeometry(0.26, 0.16, 0.02)
-  S.gPit       = new CylinderGeometry(CELL * 0.34, CELL * 0.24, 0.22, 7)
+  S.gTile = new PlaneGeometry(CELL - 0.1, CELL - 0.1)
 
-  S.mTile    = new MeshLambertMaterial({ color: C.ground })
-  S.mBarrier = new MeshLambertMaterial({ color: C.barrier })
-  S.mGold    = new MeshLambertMaterial({ color: C.gold,  emissive: new Color(C.gold),  emissiveIntensity: 0.15 })
-  S.mIce     = new MeshLambertMaterial({ color: C.ice,   emissive: new Color(C.ice),   emissiveIntensity: 0.1, transparent: true, opacity: 0.88 })
-  S.mGreen   = new MeshLambertMaterial({ color: C.green, emissive: new Color(C.green), emissiveIntensity: 0.18 })
-  S.mGreenDark = new MeshLambertMaterial({ color: '#1a7a30' })
-  S.mStart   = new MeshLambertMaterial({ color: C.start, emissive: new Color(C.start), emissiveIntensity: 0.2 })
-  S.mPole    = new MeshLambertMaterial({ color: '#888888' })
-  S.mMined   = new MeshLambertMaterial({ color: C.mined })
+  // Rock barrier: flat angular slab strata, like sedimentary rock layers
+  S.gBarrier      = new BoxGeometry(1.55, 0.36, 1.3)   // wide bottom slab
+  S.gBarrierB     = new BoxGeometry(1.25, 0.32, 1.05)  // middle slab
+  S.gBarrierC     = new BoxGeometry(0.88, 0.28, 0.72)  // top slab
+  S.gBarrierSlab  = new BoxGeometry(0.52, 0.22, 0.44)  // accent chip
+
+  // Ore bases — large flattened icosahedra that fill the cell
+  S.gGoldBase  = new IcosahedronGeometry(0.62, 1)
+  S.gGoldCryst = new OctahedronGeometry(0.22, 0)
+
+  S.gIceBase   = new IcosahedronGeometry(0.58, 1)
+  S.gIceCryst  = new OctahedronGeometry(0.15, 0)
+
+  S.gGreenOrb  = new IcosahedronGeometry(0.6, 1)
+  S.gGreenSpike= new OctahedronGeometry(0.11, 0)
+
+  S.gPole = new CylinderGeometry(0.03, 0.03, 0.88, 5)
+  S.gFlag = new BoxGeometry(0.26, 0.16, 0.02)
+  S.gPit  = new CylinderGeometry(CELL * 0.34, CELL * 0.24, 0.22, 7)
+
+  S.mTile = new MeshLambertMaterial({ color: C.ground })
+
+  // Rock: layered sedimentary strata — warm sandy stone tones
+  S.mBarrier      = new MeshStandardMaterial({ color: '#7a6e5e', roughness: 0.97, metalness: 0.0 })
+  S.mBarrierMid   = new MeshStandardMaterial({ color: '#635a4c', roughness: 0.96, metalness: 0.0 })
+  S.mBarrierDark  = new MeshStandardMaterial({ color: '#4a4038', roughness: 0.98, metalness: 0.0 })
+  S.mBarrierLight = new MeshStandardMaterial({ color: '#9a8e7a', roughness: 0.94, metalness: 0.02 })
+
+  // Gold ore
+  S.mGoldRock = new MeshStandardMaterial({ color: '#5c4a2e', roughness: 0.9,  metalness: 0.05 })
+  S.mGold     = new MeshStandardMaterial({ color: '#d4a017', roughness: 0.3,  metalness: 0.85, emissive: new Color('#c8920a'), emissiveIntensity: 0.2 })
+  S.mGoldVein = new MeshStandardMaterial({ color: '#f5d060', roughness: 0.15, metalness: 0.95, emissive: new Color('#ffcc00'), emissiveIntensity: 0.4 })
+
+  // Ice ore
+  S.mIceRock  = new MeshStandardMaterial({ color: '#2a3848', roughness: 0.88, metalness: 0.08 })
+  S.mIce      = new MeshStandardMaterial({ color: '#b8e0f8', roughness: 0.05, metalness: 0.2,  emissive: new Color('#70c0f0'), emissiveIntensity: 0.3,  transparent: true, opacity: 0.82 })
+  S.mIceCore  = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.0,  metalness: 0.35, emissive: new Color('#aaddff'), emissiveIntensity: 0.55, transparent: true, opacity: 0.68 })
+
+  // Green ore
+  S.mGreenRock = new MeshStandardMaterial({ color: '#1c3328', roughness: 0.9,  metalness: 0.05 })
+  S.mGreen     = new MeshStandardMaterial({ color: '#22c55e', roughness: 0.18, metalness: 0.42, emissive: new Color('#16a34a'), emissiveIntensity: 0.42 })
+  S.mGreenDark = new MeshStandardMaterial({ color: '#15803d', roughness: 0.28, metalness: 0.38, emissive: new Color('#166534'), emissiveIntensity: 0.28 })
+
+  S.mStart = new MeshLambertMaterial({ color: C.start, emissive: new Color(C.start), emissiveIntensity: 0.2 })
+  S.mPole  = new MeshLambertMaterial({ color: '#888888' })
+  S.mMined = new MeshLambertMaterial({ color: C.mined })
 }
-
 function disposeShared() {
   for (const v of Object.values(S)) v?.dispose?.()
   pathTubeMat?.dispose()
@@ -174,34 +211,163 @@ function makeTile(gx, gy) {
   m.position.copy(toWorld(gx, gy, 0))
   return m
 }
+// Rocky barrier — clusters of jagged boulders
 function makeBarrier(gx, gy) {
-  const m = new Mesh(S.gBarrier, S.mBarrier)
-  m.position.copy(toWorld(gx, gy, 0.5))
-  return m
+  const g = new Group()
+
+  // Bottom slab — widest, sits flush with ground, slightly rotated
+  const bot = new Mesh(S.gBarrier, S.mBarrierDark)
+  bot.position.set(0.04, 0.4, -0.05)
+  bot.rotation.set(0.0, 0.38, 0.04)
+  bot.scale.set(1,2,1)
+
+  // Middle slab — offset and counter-rotated for that broken-strata feel
+  const mid = new Mesh(S.gBarrierB, S.mBarrierMid)
+  mid.position.set(-0.06, 0.8, 0.06)
+  mid.rotation.set(0.02, -0.55, -0.05)
+  mid.scale.set(1,2.5,1)
+
+  // Top slab — narrowest, more tilted, like it's about to topple
+  const top = new Mesh(S.gBarrierC, S.mBarrier)
+  top.position.set(0.10, 1.3, -0.04)
+  top.rotation.set(0.06, 0.72, 0.10)
+  top.scale.set(1,2.2,1)
+
+  // Accent chip — small slab wedged to the side
+  const chip = new Mesh(S.gBarrierSlab, S.mBarrierLight)
+  chip.position.set(0.72, 0.28, 0.42)
+  chip.rotation.set(0.08, -0.3, 0.22)
+
+  // Second chip on other side
+  const chip2 = new Mesh(S.gBarrierSlab, S.mBarrierDark)
+  chip2.position.set(-0.65, 0.22, -0.48)
+  chip2.rotation.set(-0.05, 1.1, -0.18)
+  chip2.scale.set(0.8, 0.7, 0.9)
+
+  g.add(bot, mid, top, chip, chip2)
+  g.position.copy(toWorld(gx, gy, 0))
+  return g
 }
+// Gold ore deposit — rocky host stone with metallic crystal veins jutting out
 function makeGold(gx, gy) {
   const g = new Group()
-  const c1 = new Mesh(S.gGold, S.mGold)
-  c1.position.set(-0.2, 0.34, -0.14); c1.rotation.set(0.4, 0.7, 0); c1.scale.y = 1.5
-  const c2 = new Mesh(S.gGold, S.mGold)
-  c2.position.set(0.18, 0.27, 0.16);  c2.rotation.set(-0.3, 1.2, 0.2); c2.scale.y = 1.2
-  g.add(c1, c2)
+
+  // Large host rock base — fills the cell
+  const rock = new Mesh(S.gGoldBase, S.mGoldRock)
+  rock.position.set(0, 0.28, 0)
+  rock.rotation.set(0.3, 0.7, 0.15)
+  rock.scale.set(1.55, 0.88, 1.45)
+
+  // Main tall crystal shard
+  const c1 = new Mesh(S.gGoldCryst, S.mGold)
+  c1.position.set(-0.08, 0.9, 0.06)
+  c1.rotation.set(0.15, 0.5, -0.18)
+  c1.scale.set(0.9, 2.0, 0.9)
+
+  // Bright vein shard
+  const c2 = new Mesh(S.gGoldCryst, S.mGoldVein)
+  c2.position.set(0.32, 0.9, -0.14)
+  c2.rotation.set(-0.25, 1.2, 0.32)
+  c2.scale.set(0.7, 1.6, 0.7)
+
+  // Cluster shard
+  const c3 = new Mesh(S.gGoldCryst, S.mGold)
+  c3.position.set(-0.28, 0.9, -0.2)
+  c3.rotation.set(0.45, 2.0, 0.12)
+  c3.scale.set(0.55, 1.2, 0.55)
+
+  // Surface sparkle
+  const c4 = new Mesh(S.gGoldCryst, S.mGoldVein)
+  c4.position.set(0.2, 0.38, 0.26)
+  c4.rotation.set(-0.1, 0.8, 0.55)
+  c4.scale.setScalar(0.42)
+
+  g.add(rock, c1, c2, c3, c4)
   g.position.copy(toWorld(gx, gy, 0))
   return g
 }
+// Ice ore — dark rocky base with tall translucent ice crystal formations
 function makeIce(gx, gy) {
   const g = new Group()
-  const s1 = new Mesh(S.gIceCone, S.mIce); s1.position.set(-0.18, 0.33, 0.1);   s1.rotation.z = -0.2
-  const s2 = new Mesh(S.gIceCone, S.mIce); s2.position.set( 0.18, 0.27, -0.14); s2.rotation.z =  0.25
-  g.add(s1, s2)
+
+  // Dark base rock
+  const rock = new Mesh(S.gIceBase, S.mIceRock)
+  rock.position.set(0, 0.14, 0)
+  rock.rotation.set(0.2, 1.1, 0.1)
+  rock.scale.set(1.7, 0.9, 1.5)
+
+  // Main tall crystal
+  const ic1 = new Mesh(S.gIceCryst, S.mIce)
+  ic1.position.set(-0.08, 0.7, 0.08)
+  ic1.rotation.set(0.1, 0.3, -0.12)
+  ic1.scale.set(0.9, 2.2, 0.9)
+
+  // Inner bright core
+  const ic1core = new Mesh(S.gIceCryst, S.mIceCore)
+  ic1core.position.set(-0.08, 0.7, 0.08)
+  ic1core.rotation.set(0.1, 0.3, -0.12)
+  ic1core.scale.set(0.45, 2.0, 0.45)
+
+  // Side crystal
+  const ic2 = new Mesh(S.gIceCryst, S.mIce)
+  ic2.position.set(0.24, 0.7, -0.1)
+  ic2.rotation.set(-0.2, 1.4, 0.3)
+  ic2.scale.set(0.7, 1.7, 0.7)
+
+  // Small accent
+  const ic3 = new Mesh(S.gIceCryst, S.mIce)
+  ic3.position.set(-0.26, 0.7, -0.2)
+  ic3.rotation.set(0.4, 0.6, -0.2)
+  ic3.scale.set(0.5, 1.3, 0.5)
+
+  g.add(rock, ic1, ic1core, ic2, ic3)
   g.position.copy(toWorld(gx, gy, 0))
   return g
 }
+
+// Green ore — dark host rock with glowing emerald crystal growths
 function makeGreen(gx, gy) {
   const g = new Group()
-  const stem = new Mesh(S.gGreenStem, S.mGreenDark); stem.position.y = 0.18
-  const cap  = new Mesh(S.gGreenCap,  S.mGreen);     cap.position.y  = 0.5; cap.scale.y = 0.6
-  g.add(stem, cap)
+
+  // Large host rock
+  const rock = new Mesh(S.gGreenOrb, S.mGreenRock)
+  rock.position.set(0, 0.23, 0)
+  rock.rotation.set(0.25, 0.5, 0.15)
+  rock.scale.set(1.58, 0.88, 1.5)
+
+  // Glowing core orb
+  const orb = new Mesh(S.gGreenOrb, S.mGreen)
+  orb.position.set(0, 0.1, 0)
+  orb.rotation.set(0.15, 0.9, 0.1)
+  orb.scale.set(0.72, 0.62, 0.7)
+
+  // Central tall spike
+  const sp1 = new Mesh(S.gGreenSpike, S.mGreen)
+  sp1.position.set(0, 0.9, 0)
+  sp1.scale.set(0.9, 2.2, 0.9)
+
+  // Surrounding spikes
+  const sp2 = new Mesh(S.gGreenSpike, S.mGreenDark)
+  sp2.position.set(0.22, 0.66, 0.14)
+  sp2.rotation.set(0.35, 0.8, 0.32)
+  sp2.scale.set(0.7, 1.7, 0.7)
+
+  const sp3 = new Mesh(S.gGreenSpike, S.mGreen)
+  sp3.position.set(-0.2, 0.9, -0.2)
+  sp3.rotation.set(-0.3, 1.5, -0.28)
+  sp3.scale.set(0.6, 1.5, 0.6)
+
+  const sp4 = new Mesh(S.gGreenSpike, S.mGreenDark)
+  sp4.position.set(0.12, 0.77, -0.3)
+  sp4.rotation.set(-0.45, 2.2, 0.18)
+  sp4.scale.set(0.5, 1.2, 0.5)
+
+  const sp5 = new Mesh(S.gGreenSpike, S.mGreen)
+  sp5.position.set(-0.3, 0.7, 0.18)
+  sp5.rotation.set(0.28, 3.0, -0.22)
+  sp5.scale.set(0.45, 1.1, 0.45)
+
+  g.add(rock, orb, sp1, sp2, sp3, sp4, sp5)
   g.position.copy(toWorld(gx, gy, 0))
   return g
 }
