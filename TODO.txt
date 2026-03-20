@@ -1,4 +1,0 @@
-- scan for unused files, functions
-- check if everything matches the pdfs functions
-- pseudo
-- make video

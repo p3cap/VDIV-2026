@@ -6,7 +6,8 @@ charset-normalizer==3.4.4
 click==8.3.1
 cmake==4.2.3
 colorama==0.4.6
--e .
+scikit-build-core>=0.10
+-e ./cpp_pathfind
 fastapi==0.129.0
 filelock==3.24.3
 fsspec==2026.2.0
