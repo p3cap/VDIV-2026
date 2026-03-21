@@ -28,6 +28,7 @@ def install_depedenices():
         run(f"{sys.executable} -m venv venv", cwd=marsrover)
 
     pip_path = venv / ("Scripts/pip" if platform.system() == "Windows" else "bin/pip")
+    venv_python = venv / ("Scripts/python.exe" if platform.system() == "Windows" else "bin/python")
 
     print(f"{CYAN}Installing Python dependencies...{RESET}")
     run(f'"{pip_path}" install -r requirements.txt', cwd=marsrover)
@@ -39,5 +40,6 @@ def install_depedenices():
     print(f"{GREEN}Dashboard dependencies installed!{RESET}\n")
 
     print(f"{GREEN}Dependency installation succesful!{RESET}")
+    print(f"{GREEN}Set interpreter path to: {venv_python}{RESET}")
 
 install_depedenices()

@@ -24,9 +24,10 @@ Elérhetőségek:
 - C++ (Visual Studio-ban egy modify-t kell indítani és a c++ desktop developer kiegésztőt letölteni) [opcionális, gyorsabb machine learning model képzéshez érdemes használni]
 
 
-======== Futtatás ========
+======== Futtatás VScode-ba ========
 
 Telepísd le a függőségeket: python3 setup_deps.py
+Állísd be a python interpretert a MarsRover/venv/scripts/python.exe
 Program indítása: python3 run_dev.py
 
 
